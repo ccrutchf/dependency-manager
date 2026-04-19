@@ -1,0 +1,58 @@
+# Sample packages.yaml — covers every provider and the filter keys.
+# Run `depend plan --config examples/packages.yaml` to preview the resolved plan.
+
+all:
+  platform: all
+  architecture: all
+  flatpak:
+    org.mozilla.firefox:
+
+linux-common:
+  platform: linux
+  ppas:
+    - ppa:git-core/ppa
+  apt:
+    ripgrep:
+      dependencies: [curl]
+    curl:
+    git:
+  snap:
+    code:
+      classic: true
+
+linux-desktop:
+  platform: linux
+  architecture: amd64
+  flatpak:
+    com.visualstudio.code:
+      source: flathub
+  deb:
+    slack-desktop:
+      url: https://downloads.slack-edge.com/releases/linux/4.38.125/prod/x64/slack-desktop-4.38.125-amd64.deb
+      sha256: 0000000000000000000000000000000000000000000000000000000000000000
+  pip:
+    httpie:
+      scope: user
+    ruff:
+  pipx:
+    black:
+    poetry:
+    shell-gpt:
+      url: git+https://github.com/TheR1D/shell_gpt.git@main
+
+vscode-extensions:
+  platform: linux
+  vscode:
+    ms-python.python:
+    rust-lang.rust-analyzer:
+    github.copilot:
+
+user-tools:
+  platform: linux
+  script:
+    uv:
+      check: command -v uv
+      install: curl -LsSf https://astral.sh/uv/install.sh | sh
+    cargo:
+      check: command -v cargo
+      install: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path

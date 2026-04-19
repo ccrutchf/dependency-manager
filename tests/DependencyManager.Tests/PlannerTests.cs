@@ -1,0 +1,292 @@
+using DependencyManager.Config;
+using DependencyManager.Runner;
+using DependencyManager.Util;
+using Shouldly;
+using Xunit;
+
+namespace DependencyManager.Tests;
+
+public class PlannerTests
+{
+    private static PlatformInfo Linux => new("linux", "amd64", "5.15");
+
+    [Fact]
+    public void Skips_blocks_that_do_not_match_platform()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["windows-only"] = new()
+            {
+                Platform = "windows",
+                Apt = new Dictionary<string, PackageSpec> { ["not-applicable"] = new() },
+            },
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec> { ["curl"] = new() },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+
+        plan.Count.ShouldBe(1);
+        plan[0].Id.ShouldBe("curl");
+    }
+
+    [Fact]
+    public void Topo_sort_places_dependencies_first()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec>
+                {
+                    ["ripgrep"] = new() { Dependencies = new List<string> { "curl" } },
+                    ["curl"] = new(),
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+
+        var ids = plan.Select(p => p.Id).ToList();
+        ids.IndexOf("curl").ShouldBeLessThan(ids.IndexOf("ripgrep"));
+    }
+
+    [Fact]
+    public void Topo_sort_honors_Name_override_for_dependency_lookup()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec>
+                {
+                    ["ripgrep"] = new() { Dependencies = new List<string> { "my-curl" } },
+                    ["curl"] = new() { Name = "my-curl" },
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+
+        var ids = plan.Select(p => p.Id).ToList();
+        ids.IndexOf("curl").ShouldBeLessThan(ids.IndexOf("ripgrep"));
+    }
+
+    [Fact]
+    public void Detects_dependency_cycles()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec>
+                {
+                    ["a"] = new() { Dependencies = new List<string> { "b" } },
+                    ["b"] = new() { Dependencies = new List<string> { "a" } },
+                },
+            },
+        });
+
+        Should.Throw<InvalidOperationException>(() => Planner.Plan(config, Linux));
+    }
+
+    [Fact]
+    public void Later_block_wins_on_duplicate_manager_id_pair()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["a"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec> { ["curl"] = new() { Source = "first" } },
+            },
+            ["b"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec> { ["curl"] = new() { Source = "second" } },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Spec.Source.ShouldBe("second");
+    }
+
+    [Fact]
+    public void Unknown_dependency_name_is_ignored()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec>
+                {
+                    ["solo"] = new() { Dependencies = new List<string> { "does-not-exist" } },
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Id.ShouldBe("solo");
+    }
+
+    [Fact]
+    public void Collects_ppas_from_matching_blocks_and_dedupes()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["a"] = new()
+            {
+                Platform = "linux",
+                Ppas = new List<string> { "ppa:neovim-ppa/unstable", "ppa:git-core/ppa" },
+                Apt = new Dictionary<string, PackageSpec> { ["neovim"] = new() },
+            },
+            ["b"] = new()
+            {
+                Platform = "linux",
+                Ppas = new List<string> { "ppa:git-core/ppa" },
+                Apt = new Dictionary<string, PackageSpec> { ["git"] = new() },
+            },
+            ["windows-only"] = new()
+            {
+                Platform = "windows",
+                Ppas = new List<string> { "ppa:should-not-appear/ever" },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux);
+
+        plan.AptPpas.ShouldBe(new[] { "ppa:neovim-ppa/unstable", "ppa:git-core/ppa" });
+    }
+
+    [Fact]
+    public void Deb_packages_flow_through_plan()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Deb = new Dictionary<string, PackageSpec>
+                {
+                    ["slack-desktop"] = new() { Url = "https://example.com/slack.deb", Sha256 = "abc" },
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Manager.ShouldBe(ManagerKind.Deb);
+        plan[0].Id.ShouldBe("slack-desktop");
+        plan[0].Spec.Url.ShouldBe("https://example.com/slack.deb");
+    }
+
+    [Fact]
+    public void Pip_packages_flow_through_plan()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Pip = new Dictionary<string, PackageSpec>
+                {
+                    ["httpie"] = new(),
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Manager.ShouldBe(ManagerKind.Pip);
+        plan[0].Id.ShouldBe("httpie");
+    }
+
+    [Fact]
+    public void Pipx_packages_flow_through_plan()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Pipx = new Dictionary<string, PackageSpec>
+                {
+                    ["httpie"] = new(),
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Manager.ShouldBe(ManagerKind.Pipx);
+        plan[0].Id.ShouldBe("httpie");
+    }
+
+    [Fact]
+    public void Script_packages_flow_through_plan()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Script = new Dictionary<string, PackageSpec>
+                {
+                    ["uv"] = new() { Check = "command -v uv", Install = "echo install" },
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Manager.ShouldBe(ManagerKind.Script);
+        plan[0].Id.ShouldBe("uv");
+        plan[0].Spec.Check.ShouldBe("command -v uv");
+        plan[0].Spec.Install.ShouldBe("echo install");
+    }
+
+    [Fact]
+    public void Vscode_packages_flow_through_plan()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Vscode = new Dictionary<string, PackageSpec>
+                {
+                    ["ms-python.python"] = new(),
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Manager.ShouldBe(ManagerKind.VsCode);
+        plan[0].Id.ShouldBe("ms-python.python");
+    }
+
+    [Fact]
+    public void Ppas_empty_when_no_blocks_declare_them()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec> { ["curl"] = new() },
+            },
+        });
+
+        Planner.Plan(config, Linux).AptPpas.Count.ShouldBe(0);
+    }
+}
