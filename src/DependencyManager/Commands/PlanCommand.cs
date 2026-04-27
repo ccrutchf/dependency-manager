@@ -25,6 +25,12 @@ public static class PlanCommand
             foreach (var ppa in plan.AptPpas)
                 Console.WriteLine($"  {ppa}");
         }
+        if (plan.AptSources.Count > 0)
+        {
+            Console.WriteLine($"apt sources ({plan.AptSources.Count}):");
+            foreach (var s in plan.AptSources)
+                Console.WriteLine($"  {s.Name} -> {s.Source.Uri ?? "?"}  (from {s.BlockName})");
+        }
         Console.WriteLine($"resolved {plan.Packages.Count} package(s):");
         foreach (var pkg in plan.Packages)
         {

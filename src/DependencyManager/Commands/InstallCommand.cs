@@ -36,6 +36,8 @@ public static class InstallCommand
         Console.WriteLine($"plan: {plan.Packages.Count} package(s)");
         if (plan.AptPpas.Count > 0)
             Console.WriteLine($"ppas:  {string.Join(", ", plan.AptPpas)}");
+        if (plan.AptSources.Count > 0)
+            Console.WriteLine($"apt sources: {string.Join(", ", plan.AptSources.Select(s => s.Name))}");
 
         if (RootCheck.PlanRequiresSudo(plan))
         {
@@ -55,7 +57,7 @@ public static class InstallCommand
 
     internal static IPackageManager[] BuildManagers(ResolvedPlan plan) =>
     [
-        new AptManager(plan.AptPpas),
+        new AptManager(plan.AptPpas, plan.AptSources),
         new SnapManager(),
         new FlatpakManager(userScope: true),
         new DebManager(),

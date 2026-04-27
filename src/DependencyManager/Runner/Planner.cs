@@ -10,6 +10,8 @@ public static class Planner
         var resolved = new Dictionary<(ManagerKind, string), ResolvedPackage>();
         var ppas = new List<string>();
         var seenPpas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var aptSources = new Dictionary<string, ResolvedAptSource>(StringComparer.OrdinalIgnoreCase);
+        var aptSourceOrder = new List<string>();
 
         foreach (var (blockName, block) in config.Blocks)
         {
@@ -24,6 +26,15 @@ public static class Planner
             Flatten(block.Vscode, ManagerKind.VsCode, blockName, resolved);
             Flatten(block.Cargo, ManagerKind.Cargo, blockName, resolved);
 
+            if (block.AptSources is not null)
+            {
+                foreach (var (name, source) in block.AptSources)
+                {
+                    if (!aptSources.ContainsKey(name)) aptSourceOrder.Add(name);
+                    aptSources[name] = new ResolvedAptSource(name, source ?? new AptSource(), blockName);
+                }
+            }
+
             if (block.Ppas is null) continue;
             foreach (var ppa in block.Ppas)
             {
@@ -31,7 +42,8 @@ public static class Planner
             }
         }
 
-        return new ResolvedPlan(TopoSort(resolved.Values.ToList()), ppas);
+        var resolvedSources = aptSourceOrder.Select(n => aptSources[n]).ToList();
+        return new ResolvedPlan(TopoSort(resolved.Values.ToList()), ppas, resolvedSources);
     }
 
     private static void Flatten(

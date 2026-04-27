@@ -22,6 +22,7 @@ public sealed record Block
     public string? Version { get; init; }
 
     public List<string>? Ppas { get; init; }
+    public Dictionary<string, AptSource>? AptSources { get; init; }
 
     public Dictionary<string, PackageSpec>? Apt { get; init; }
     public Dictionary<string, PackageSpec>? Snap { get; init; }
@@ -54,12 +55,25 @@ public sealed record PackageSpec
     };
 }
 
+public sealed record AptSource
+{
+    public string? KeyUrl { get; init; }
+    public string? Uri { get; init; }
+    public string? Suite { get; init; }
+    public string? Components { get; init; }
+    public string? Architectures { get; init; }
+    public string? SignedBy { get; init; }
+}
+
 public sealed record ResolvedPackage(
     ManagerKind Manager,
     string Id,
     PackageSpec Spec,
     string BlockName);
 
+public sealed record ResolvedAptSource(string Name, AptSource Source, string BlockName);
+
 public sealed record ResolvedPlan(
     IReadOnlyList<ResolvedPackage> Packages,
-    IReadOnlyList<string> AptPpas);
+    IReadOnlyList<string> AptPpas,
+    IReadOnlyList<ResolvedAptSource> AptSources);

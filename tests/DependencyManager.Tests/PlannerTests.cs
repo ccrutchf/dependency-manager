@@ -276,6 +276,58 @@ public class PlannerTests
     }
 
     [Fact]
+    public void Apt_sources_flow_through_plan_in_first_seen_order()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["a"] = new()
+            {
+                Platform = "linux",
+                AptSources = new Dictionary<string, AptSource>
+                {
+                    ["docker"] = new()
+                    {
+                        KeyUrl = "https://download.docker.com/linux/ubuntu/gpg",
+                        Uri = "https://download.docker.com/linux/ubuntu",
+                        Components = "stable",
+                    },
+                },
+            },
+            ["b"] = new()
+            {
+                Platform = "linux",
+                AptSources = new Dictionary<string, AptSource>
+                {
+                    ["hashicorp"] = new()
+                    {
+                        KeyUrl = "https://apt.releases.hashicorp.com/gpg",
+                        Uri = "https://apt.releases.hashicorp.com",
+                    },
+                    ["docker"] = new()
+                    {
+                        KeyUrl = "https://download.docker.com/linux/ubuntu/gpg",
+                        Uri = "https://download.docker.com/linux/ubuntu",
+                        Components = "edge",
+                    },
+                },
+            },
+            ["windows-only"] = new()
+            {
+                Platform = "windows",
+                AptSources = new Dictionary<string, AptSource>
+                {
+                    ["should-not-appear"] = new() { KeyUrl = "x", Uri = "y" },
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux);
+
+        plan.AptSources.Select(s => s.Name).ShouldBe(new[] { "docker", "hashicorp" });
+        plan.AptSources.First(s => s.Name == "docker").Source.Components.ShouldBe("edge");
+    }
+
+    [Fact]
     public void Ppas_empty_when_no_blocks_declare_them()
     {
         var config = new ConfigFile(new Dictionary<string, Block>
@@ -287,6 +339,8 @@ public class PlannerTests
             },
         });
 
-        Planner.Plan(config, Linux).AptPpas.Count.ShouldBe(0);
+        var plan = Planner.Plan(config, Linux);
+        plan.AptPpas.Count.ShouldBe(0);
+        plan.AptSources.Count.ShouldBe(0);
     }
 }

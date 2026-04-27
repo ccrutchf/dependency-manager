@@ -17,6 +17,7 @@ public static class RootCheck
     public static bool PlanRequiresSudo(ResolvedPlan plan)
     {
         if (plan.AptPpas.Count > 0) return true;
+        if (plan.AptSources.Count > 0) return true;
         foreach (var pkg in plan.Packages)
         {
             if (pkg.Manager is ManagerKind.Apt or ManagerKind.Snap or ManagerKind.Deb) return true;

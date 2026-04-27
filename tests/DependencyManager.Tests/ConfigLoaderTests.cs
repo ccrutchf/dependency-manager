@@ -197,6 +197,32 @@ public class ConfigLoaderTests
     }
 
     [Fact]
+    public void Parses_apt_sources_block()
+    {
+        const string yaml = """
+            docker:
+              platform: linux
+              apt_sources:
+                docker:
+                  keyUrl: https://download.docker.com/linux/ubuntu/gpg
+                  uri: https://download.docker.com/linux/ubuntu
+                  components: stable
+                  signedBy: /etc/apt/keyrings/docker.asc
+              apt:
+                docker-ce:
+            """;
+
+        var config = ConfigLoader.Parse(yaml);
+        var block = config.Blocks["docker"];
+        block.AptSources.ShouldNotBeNull();
+        var src = block.AptSources["docker"];
+        src.KeyUrl.ShouldBe("https://download.docker.com/linux/ubuntu/gpg");
+        src.Uri.ShouldBe("https://download.docker.com/linux/ubuntu");
+        src.Components.ShouldBe("stable");
+        src.SignedBy.ShouldBe("/etc/apt/keyrings/docker.asc");
+    }
+
+    [Fact]
     public void Accepts_version_filter()
     {
         const string yaml = """

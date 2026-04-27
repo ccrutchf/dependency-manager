@@ -13,6 +13,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         new(StringComparer.OrdinalIgnoreCase) { "apt", "snap", "flatpak", "deb", "pip", "pipx", "script", "vscode", "cargo" };
 
     private const string PpasKey = "ppas";
+    private const string AptSourcesKey = "apt_sources";
 
     public bool Accepts(Type type) => type == typeof(Block);
 
@@ -24,6 +25,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         string architecture = "all";
         string? version = null;
         List<string>? ppas = null;
+        Dictionary<string, AptSource>? aptSources = null;
         Dictionary<string, PackageSpec>? apt = null;
         Dictionary<string, PackageSpec>? snap = null;
         Dictionary<string, PackageSpec>? flatpak = null;
@@ -53,6 +55,10 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             {
                 ppas = (List<string>?)rootDeserializer(typeof(List<string>));
             }
+            else if (string.Equals(key, AptSourcesKey, StringComparison.OrdinalIgnoreCase))
+            {
+                aptSources = (Dictionary<string, AptSource>?)rootDeserializer(typeof(Dictionary<string, AptSource>));
+            }
             else if (ProviderKeys.Contains(key))
             {
                 var section = (Dictionary<string, PackageSpec>?)rootDeserializer(typeof(Dictionary<string, PackageSpec>))
@@ -72,7 +78,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             }
             else
             {
-                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo)");
+                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo)");
                 _ = rootDeserializer(typeof(object));
             }
         }
@@ -83,6 +89,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             Architecture = architecture,
             Version = version,
             Ppas = ppas,
+            AptSources = aptSources,
             Apt = apt,
             Snap = snap,
             Flatpak = flatpak,
