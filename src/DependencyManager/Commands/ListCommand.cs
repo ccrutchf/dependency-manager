@@ -16,6 +16,7 @@ public static class ListCommand
             new PipxManager(),
             new ScriptManager(),
             new VsCodeManager(),
+            new CargoManager(),
         };
 
         foreach (var m in managers)

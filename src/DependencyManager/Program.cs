@@ -31,10 +31,14 @@ testCmd.SetAction((parseResult, ct) => TestCommand.RunAsync(parseResult.GetValue
 var listCmd = new Command("list", "Show which package managers are available on this machine");
 listCmd.SetAction(_ => ListCommand.Run());
 
+var updateCmd = new Command("update", "Update all packages via every available provider");
+updateCmd.SetAction((_, ct) => UpdateCommand.RunAsync(ct));
+
 var root = new RootCommand("depend — declarative package installer");
 root.Subcommands.Add(planCmd);
 root.Subcommands.Add(installCmd);
 root.Subcommands.Add(testCmd);
 root.Subcommands.Add(listCmd);
+root.Subcommands.Add(updateCmd);
 
 return await root.Parse(args).InvokeAsync();

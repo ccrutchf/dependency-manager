@@ -46,4 +46,15 @@ public sealed class AptManager : IPackageManager
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"apt-get install {pkg.Id} failed: {result.StdErr.Trim()}");
     }
+
+    public async Task UpdateAllAsync(CancellationToken ct)
+    {
+        var refresh = await Sudo.RunAsync("apt-get", ["update"], ct);
+        if (refresh.ExitCode != 0)
+            throw new InvalidOperationException($"apt-get update failed: {refresh.StdErr.Trim()}");
+
+        var upgrade = await Sudo.RunAsync("apt-get", ["upgrade", "-y"], ct);
+        if (upgrade.ExitCode != 0)
+            throw new InvalidOperationException($"apt-get upgrade failed: {upgrade.StdErr.Trim()}");
+    }
 }

@@ -63,5 +63,6 @@ public static class InstallCommand
         new PipxManager(userScope: true),
         new ScriptManager(),
         new VsCodeManager(),
+        new CargoManager(),
     ];
 }

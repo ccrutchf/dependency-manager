@@ -43,4 +43,16 @@ public sealed class PipxManager : IPackageManager
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"pipx install {pkg.Id} failed: {result.StdErr.Trim()}");
     }
+
+    public async Task UpdateAllAsync(CancellationToken ct)
+    {
+        var args = new List<string> { "upgrade-all" };
+        if (!_userScope) args.Add("--global");
+
+        var result = _userScope
+            ? await ProcessRunner.RunAsync("pipx", args, ct)
+            : await Sudo.RunAsync("pipx", args, ct);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"pipx upgrade-all failed: {result.StdErr.Trim()}");
+    }
 }

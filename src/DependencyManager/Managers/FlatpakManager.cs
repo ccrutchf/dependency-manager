@@ -45,6 +45,17 @@ public sealed class FlatpakManager : IPackageManager
             throw new InvalidOperationException($"flatpak install {remote} {pkg.Id} failed: {result.StdErr.Trim()}");
     }
 
+    public async Task UpdateAllAsync(CancellationToken ct)
+    {
+        var scopeFlag = _userScope ? "--user" : "--system";
+        var args = new[] { "update", scopeFlag, "-y" };
+        var result = _userScope
+            ? await ProcessRunner.RunAsync("flatpak", args, ct)
+            : await Sudo.RunAsync("flatpak", args, ct);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"flatpak update {scopeFlag} failed: {result.StdErr.Trim()}");
+    }
+
     private async Task EnsureFlathubAsync(bool userScope, CancellationToken ct)
     {
         if (!_remoteAdded.Add(userScope)) return;

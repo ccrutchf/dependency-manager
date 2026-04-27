@@ -35,4 +35,27 @@ public sealed class VsCodeManager : IPackageManager
             throw new InvalidOperationException(
                 $"{binary} --install-extension {pkg.Id} failed: {result.StdErr.Trim()}");
     }
+
+    public async Task UpdateAllAsync(CancellationToken ct)
+    {
+        var list = await ProcessRunner.RunAsync(DefaultBinary, ["--list-extensions"], ct);
+        if (list.ExitCode != 0)
+            throw new InvalidOperationException($"{DefaultBinary} --list-extensions failed: {list.StdErr.Trim()}");
+
+        var failures = new List<string>();
+        foreach (var line in list.StdOut.Split('\n'))
+        {
+            var id = line.Trim();
+            if (id.Length == 0) continue;
+
+            var result = await ProcessRunner.RunAsync(DefaultBinary,
+                ["--install-extension", id, "--force"], ct);
+            if (result.ExitCode != 0)
+                failures.Add($"{id}: {result.StdErr.Trim()}");
+        }
+
+        if (failures.Count > 0)
+            throw new InvalidOperationException(
+                $"{DefaultBinary} --install-extension failed for {failures.Count} extension(s): {string.Join("; ", failures)}");
+    }
 }

@@ -22,6 +22,7 @@ public static class Planner
             Flatten(block.Pipx, ManagerKind.Pipx, blockName, resolved);
             Flatten(block.Script, ManagerKind.Script, blockName, resolved);
             Flatten(block.Vscode, ManagerKind.VsCode, blockName, resolved);
+            Flatten(block.Cargo, ManagerKind.Cargo, blockName, resolved);
 
             if (block.Ppas is null) continue;
             foreach (var ppa in block.Ppas)

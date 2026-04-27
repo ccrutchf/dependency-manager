@@ -39,6 +39,12 @@ public sealed class PipManager : IPackageManager
             throw new InvalidOperationException($"pip install {pkg.Id} failed: {result.StdErr.Trim()}");
     }
 
+    public Task UpdateAllAsync(CancellationToken ct)
+    {
+        Console.WriteLine("  [skip]    pip       no bulk update (pip has no reliable upgrade-all)");
+        return Task.CompletedTask;
+    }
+
     private static string? ResolveBinary()
     {
         if (ProcessRunner.OnPath("pip3")) return "pip3";

@@ -32,4 +32,11 @@ public sealed class SnapManager : IPackageManager
             throw new InvalidOperationException($"snap install {pkg.Id} failed: {stderr}");
         }
     }
+
+    public async Task UpdateAllAsync(CancellationToken ct)
+    {
+        var result = await Sudo.RunAsync("snap", ["refresh"], ct);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"snap refresh failed: {result.StdErr.Trim()}");
+    }
 }

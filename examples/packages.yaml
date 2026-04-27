@@ -39,6 +39,9 @@ linux-desktop:
     poetry:
     shell-gpt:
       url: git+https://github.com/TheR1D/shell_gpt.git@main
+  cargo:
+    ripgrep:
+    cargo-update:
 
 vscode-extensions:
   platform: linux

@@ -8,6 +8,13 @@ public sealed class DebManager : IPackageManager
 {
     private static readonly HttpClient Http = new();
 
+    private readonly DebCache _cache;
+
+    public DebManager(DebCache? cache = null)
+    {
+        _cache = cache ?? new DebCache();
+    }
+
     public ManagerKind Kind => ManagerKind.Deb;
 
     public bool IsAvailable() =>
@@ -30,25 +37,79 @@ public sealed class DebManager : IPackageManager
         try
         {
             await DownloadAsync(url, tempPath, ct);
+            var sha256 = await ComputeSha256Async(tempPath, ct);
 
             if (!string.IsNullOrWhiteSpace(pkg.Spec.Sha256))
-                await VerifySha256Async(tempPath, pkg.Spec.Sha256, ct);
+                VerifySha256(sha256, pkg.Spec.Sha256);
 
-            var install = await Sudo.RunAsync("dpkg", ["-i", tempPath], ct);
-            if (install.ExitCode == 0) return;
-
-            var fix = await Sudo.RunAsync("apt-get", ["install", "-y", "-f"], ct);
-            if (fix.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"dpkg -i {pkg.Id} failed: {install.StdErr.Trim()}; apt-get install -f also failed: {fix.StdErr.Trim()}");
+            await DpkgInstallAsync(pkg.Id, tempPath, ct);
+            await _cache.RecordAsync(url, sha256, ct);
         }
         finally
         {
-            if (File.Exists(tempPath))
+            TryDelete(tempPath);
+        }
+    }
+
+    public async Task UpdateAllAsync(CancellationToken ct)
+    {
+        var entries = await _cache.LoadAsync(ct);
+        if (entries.Count == 0)
+        {
+            Console.WriteLine("  [skip]    deb       no cached .deb downloads");
+            return;
+        }
+
+        var updated = false;
+        var failures = new List<string>();
+
+        foreach (var (url, entry) in entries.ToList())
+        {
+            var tempPath = Path.Combine(Path.GetTempPath(), $"depend-{Guid.NewGuid():N}.deb");
+            try
             {
-                try { File.Delete(tempPath); } catch { }
+                await DownloadAsync(url, tempPath, ct);
+                var sha256 = await ComputeSha256Async(tempPath, ct);
+
+                if (string.Equals(sha256, entry.Sha256, StringComparison.OrdinalIgnoreCase))
+                {
+                    Console.WriteLine($"  [ok]      deb       unchanged: {url}");
+                    continue;
+                }
+
+                Console.WriteLine($"  [update]  deb       sha256 changed: {url}");
+                await DpkgInstallAsync(url, tempPath, ct);
+                entries[url] = new DebCacheEntry(sha256, DateTimeOffset.UtcNow);
+                updated = true;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [FAIL]    deb       {url}: {ex.Message}");
+                failures.Add($"{url}: {ex.Message}");
+            }
+            finally
+            {
+                TryDelete(tempPath);
             }
         }
+
+        if (updated)
+            await _cache.SaveAsync(entries, ct);
+
+        if (failures.Count > 0)
+            throw new InvalidOperationException(
+                $"{failures.Count} deb update(s) failed: {string.Join("; ", failures)}");
+    }
+
+    private static async Task DpkgInstallAsync(string label, string debPath, CancellationToken ct)
+    {
+        var install = await Sudo.RunAsync("dpkg", ["-i", debPath], ct);
+        if (install.ExitCode == 0) return;
+
+        var fix = await Sudo.RunAsync("apt-get", ["install", "-y", "-f"], ct);
+        if (fix.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"dpkg -i {label} failed: {install.StdErr.Trim()}; apt-get install -f also failed: {fix.StdErr.Trim()}");
     }
 
     private static async Task DownloadAsync(string url, string destination, CancellationToken ct)
@@ -62,13 +123,24 @@ public sealed class DebManager : IPackageManager
         await src.CopyToAsync(dst, ct);
     }
 
-    private static async Task VerifySha256Async(string path, string expected, CancellationToken ct)
+    private static async Task<string> ComputeSha256Async(string path, CancellationToken ct)
     {
         await using var stream = File.OpenRead(path);
         var hash = await SHA256.HashDataAsync(stream, ct);
-        var actual = Convert.ToHexString(hash);
-        if (!string.Equals(actual, expected.Replace("-", ""), StringComparison.OrdinalIgnoreCase))
+        return Convert.ToHexString(hash).ToLowerInvariant();
+    }
+
+    private static void VerifySha256(string actual, string expected)
+    {
+        var normalized = expected.Replace("-", "");
+        if (!string.Equals(actual, normalized, StringComparison.OrdinalIgnoreCase))
             throw new InvalidOperationException(
-                $"sha256 mismatch for {path}: expected {expected}, got {actual.ToLowerInvariant()}");
+                $"sha256 mismatch: expected {expected}, got {actual}");
+    }
+
+    private static void TryDelete(string path)
+    {
+        if (!File.Exists(path)) return;
+        try { File.Delete(path); } catch { }
     }
 }

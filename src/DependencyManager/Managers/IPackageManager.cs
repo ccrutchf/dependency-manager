@@ -9,4 +9,5 @@ public interface IPackageManager
     Task BootstrapAsync(CancellationToken ct);
     Task<bool> IsInstalledAsync(ResolvedPackage pkg, CancellationToken ct);
     Task InstallAsync(ResolvedPackage pkg, CancellationToken ct);
+    Task UpdateAllAsync(CancellationToken ct);
 }

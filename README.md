@@ -1,6 +1,6 @@
 # dependency-manager
 
-A single-binary CLI that installs packages declared in a YAML config across Linux package managers (apt, snap, flatpak).
+A single-binary CLI that installs packages declared in a YAML config across Linux package managers (apt, snap, flatpak, deb, pip, pipx, cargo, vscode, script).
 
 Ship-as-one-file successor to https://github.com/clcrutch/dependency-manager.
 
@@ -10,6 +10,8 @@ Ship-as-one-file successor to https://github.com/clcrutch/dependency-manager.
 depend plan --config packages.yaml    # preview resolved plan
 sudo depend install --config packages.yaml
 depend test --config packages.yaml    # exit 0 if everything in the plan is installed
+depend list                           # show which managers are available on this machine
+depend update                         # update all packages via every available provider
 ```
 
 See `examples/packages.yaml` for config shape.

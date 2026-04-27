@@ -30,6 +30,12 @@ public sealed class ScriptManager : IPackageManager
                 $"script {pkg.Id} exited {result.ExitCode}: {result.StdErr.Trim()}");
     }
 
+    public Task UpdateAllAsync(CancellationToken ct)
+    {
+        Console.WriteLine("  [skip]    script    no bulk update (scripts are one-shot)");
+        return Task.CompletedTask;
+    }
+
     private static async Task<ProcessResult> RunShellAsync(
         string command,
         bool streamToConsole,
