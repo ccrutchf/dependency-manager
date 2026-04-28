@@ -157,6 +157,46 @@ public class DebCacheTests : IDisposable
     }
 
     [Fact]
+    public async Task RecordAsync_with_packageId_evicts_other_urls_for_same_package()
+    {
+        var cache = new DebCache(_cachePath);
+        const string oldUrl = "https://example.com/foo-0.1.deb";
+        const string newUrl = "https://example.com/foo-0.2.deb";
+
+        await cache.RecordAsync(oldUrl, "old-sha", "foo", CancellationToken.None);
+        await cache.RecordAsync(newUrl, "new-sha", "foo", CancellationToken.None);
+
+        var entries = await cache.LoadAsync(CancellationToken.None);
+        entries.Count.ShouldBe(1);
+        entries.ShouldContainKey(newUrl);
+        entries[newUrl].PackageId.ShouldBe("foo");
+    }
+
+    [Fact]
+    public async Task RecordAsync_with_packageId_keeps_entries_for_different_packages()
+    {
+        var cache = new DebCache(_cachePath);
+
+        await cache.RecordAsync("https://a.example/foo.deb", "sha-a", "foo", CancellationToken.None);
+        await cache.RecordAsync("https://b.example/bar.deb", "sha-b", "bar", CancellationToken.None);
+
+        var entries = await cache.LoadAsync(CancellationToken.None);
+        entries.Count.ShouldBe(2);
+    }
+
+    [Fact]
+    public async Task RecordAsync_without_packageId_does_not_evict_existing_entries()
+    {
+        var cache = new DebCache(_cachePath);
+
+        await cache.RecordAsync("https://a.example/foo.deb", "sha-a", "foo", CancellationToken.None);
+        await cache.RecordAsync("https://b.example/foo.deb", "sha-b", CancellationToken.None);
+
+        var entries = await cache.LoadAsync(CancellationToken.None);
+        entries.Count.ShouldBe(2);
+    }
+
+    [Fact]
     public async Task LoadAsync_returns_empty_when_file_contains_null_json()
     {
         Directory.CreateDirectory(_tempDir);

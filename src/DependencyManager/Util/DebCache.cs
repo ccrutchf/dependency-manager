@@ -3,7 +3,10 @@ using System.Text.Json.Serialization;
 
 namespace DependencyManager.Util;
 
-public sealed record DebCacheEntry(string Sha256, DateTimeOffset InstalledAt);
+public sealed record DebCacheEntry(
+    string Sha256,
+    DateTimeOffset InstalledAt,
+    string? PackageId = null);
 
 public sealed class DebCache
 {
@@ -60,10 +63,22 @@ public sealed class DebCache
         File.Move(tmp, _path, overwrite: true);
     }
 
-    public async Task RecordAsync(string url, string sha256, CancellationToken ct)
+    public Task RecordAsync(string url, string sha256, CancellationToken ct) =>
+        RecordAsync(url, sha256, packageId: null, ct);
+
+    public async Task RecordAsync(string url, string sha256, string? packageId, CancellationToken ct)
     {
         var entries = await LoadAsync(ct);
-        entries[url] = new DebCacheEntry(sha256, DateTimeOffset.UtcNow);
+        if (!string.IsNullOrEmpty(packageId))
+        {
+            var stale = entries
+                .Where(kv => kv.Key != url
+                    && string.Equals(kv.Value.PackageId, packageId, StringComparison.Ordinal))
+                .Select(kv => kv.Key)
+                .ToList();
+            foreach (var key in stale) entries.Remove(key);
+        }
+        entries[url] = new DebCacheEntry(sha256, DateTimeOffset.UtcNow, packageId);
         await SaveAsync(entries, ct);
     }
 }

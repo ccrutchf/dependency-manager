@@ -25,7 +25,23 @@ public sealed class DebManager : IPackageManager
     public async Task<bool> IsInstalledAsync(ResolvedPackage pkg, CancellationToken ct)
     {
         var result = await ProcessRunner.RunAsync("dpkg", ["-s", pkg.Id], ct);
-        return result.ExitCode == 0 && result.StdOut.Contains("Status: install ok installed");
+        if (result.ExitCode != 0 || !result.StdOut.Contains("Status: install ok installed"))
+            return false;
+
+        var url = pkg.Spec.Url;
+        if (string.IsNullOrWhiteSpace(url)) return true;
+
+        var entries = await _cache.LoadAsync(ct);
+        if (!entries.TryGetValue(url, out var entry)) return false;
+
+        if (!string.IsNullOrWhiteSpace(pkg.Spec.Sha256))
+        {
+            var expected = pkg.Spec.Sha256.Replace("-", "");
+            if (!string.Equals(entry.Sha256, expected, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+
+        return true;
     }
 
     public async Task InstallAsync(ResolvedPackage pkg, CancellationToken ct)
@@ -43,7 +59,8 @@ public sealed class DebManager : IPackageManager
                 VerifySha256(sha256, pkg.Spec.Sha256);
 
             await DpkgInstallAsync(pkg.Id, tempPath, ct);
-            await _cache.RecordAsync(url, sha256, ct);
+            var packageId = await ReadPackageFieldAsync(tempPath, ct);
+            await _cache.RecordAsync(url, sha256, packageId, ct);
         }
         finally
         {
@@ -79,7 +96,8 @@ public sealed class DebManager : IPackageManager
 
                 Console.WriteLine($"  [update]  deb       sha256 changed: {url}");
                 await DpkgInstallAsync(url, tempPath, ct);
-                entries[url] = new DebCacheEntry(sha256, DateTimeOffset.UtcNow);
+                var packageId = await ReadPackageFieldAsync(tempPath, ct) ?? entry.PackageId;
+                entries[url] = new DebCacheEntry(sha256, DateTimeOffset.UtcNow, packageId);
                 updated = true;
             }
             catch (Exception ex)
@@ -99,6 +117,14 @@ public sealed class DebManager : IPackageManager
         if (failures.Count > 0)
             throw new InvalidOperationException(
                 $"{failures.Count} deb update(s) failed: {string.Join("; ", failures)}");
+    }
+
+    private static async Task<string?> ReadPackageFieldAsync(string debPath, CancellationToken ct)
+    {
+        var result = await ProcessRunner.RunAsync("dpkg-deb", ["-f", debPath, "Package"], ct);
+        if (result.ExitCode != 0) return null;
+        var name = result.StdOut.Trim();
+        return string.IsNullOrEmpty(name) ? null : name;
     }
 
     private static async Task DpkgInstallAsync(string label, string debPath, CancellationToken ct)
