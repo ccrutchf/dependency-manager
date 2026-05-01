@@ -67,13 +67,7 @@ public sealed class Runner
 
     public async Task<int> TestAsync(IReadOnlyList<ResolvedPackage> plan, CancellationToken ct)
     {
-        var missing = new List<ResolvedPackage>();
-        foreach (var pkg in plan)
-        {
-            var manager = ManagerFor(pkg);
-            if (manager is null || !await manager.IsInstalledAsync(pkg, ct))
-                missing.Add(pkg);
-        }
+        var missing = await FindMissingAsync(plan, ct);
 
         if (missing.Count == 0)
         {
@@ -85,6 +79,20 @@ public sealed class Runner
         foreach (var pkg in missing)
             Console.WriteLine($"  {pkg.Manager,-8} {pkg.Id}");
         return 1;
+    }
+
+    public async Task<IReadOnlyList<ResolvedPackage>> FindMissingAsync(
+        IReadOnlyList<ResolvedPackage> plan,
+        CancellationToken ct)
+    {
+        var missing = new List<ResolvedPackage>();
+        foreach (var pkg in plan)
+        {
+            var manager = ManagerFor(pkg);
+            if (manager is null || !await manager.IsInstalledAsync(pkg, ct))
+                missing.Add(pkg);
+        }
+        return missing;
     }
 
     private IPackageManager? ManagerFor(ResolvedPackage pkg)

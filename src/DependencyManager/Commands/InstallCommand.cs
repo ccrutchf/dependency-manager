@@ -39,7 +39,20 @@ public static class InstallCommand
         if (plan.AptSources.Count > 0)
             Console.WriteLine($"apt sources: {string.Join(", ", plan.AptSources.Select(s => s.Name))}");
 
-        if (RootCheck.PlanRequiresSudo(plan))
+        var managers = BuildManagers(plan);
+        var runner = new Runner.Runner(managers);
+        var missing = await runner.FindMissingAsync(plan.Packages, ct);
+
+        if (missing.Count == 0)
+        {
+            Console.WriteLine("all packages already installed; nothing to do.");
+            return 0;
+        }
+
+        Console.WriteLine($"missing: {missing.Count} package(s)");
+
+        var effectivePlan = EffectivePlan(plan, missing);
+        if (RootCheck.PlanRequiresSudo(effectivePlan))
         {
             Console.WriteLine("this plan includes privileged operations — priming sudo...");
             if (!await Sudo.PrimeAsync(ct))
@@ -50,9 +63,16 @@ public static class InstallCommand
         }
         Console.WriteLine();
 
-        var managers = BuildManagers(plan);
-        var runner = new Runner.Runner(managers);
-        return await runner.InstallAsync(plan.Packages, failFast, ct);
+        return await runner.InstallAsync(missing, failFast, ct);
+    }
+
+    private static ResolvedPlan EffectivePlan(ResolvedPlan plan, IReadOnlyList<ResolvedPackage> missing)
+    {
+        var hasMissingApt = missing.Any(p => p.Manager == ManagerKind.Apt);
+        return new ResolvedPlan(
+            missing,
+            hasMissingApt ? plan.AptPpas : Array.Empty<string>(),
+            hasMissingApt ? plan.AptSources : Array.Empty<ResolvedAptSource>());
     }
 
     internal static IPackageManager[] BuildManagers(ResolvedPlan plan) =>
