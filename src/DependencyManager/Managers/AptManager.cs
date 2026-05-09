@@ -30,6 +30,8 @@ public sealed class AptManager : IPackageManager
     {
         if (_bootstrapped) return;
 
+        await EnableForeignArchitecturesAsync(ct);
+
         foreach (var src in _sources)
             await InstallSourceAsync(src, ct);
 
@@ -80,9 +82,6 @@ public sealed class AptManager : IPackageManager
         if (string.IsNullOrWhiteSpace(source.Uri))
             throw new InvalidOperationException($"apt source '{name}' is missing 'uri'");
 
-        var keyringPath = string.IsNullOrWhiteSpace(source.SignedBy)
-            ? $"/etc/apt/keyrings/{name}.asc"
-            : source.SignedBy!;
         var sourcesPath = $"/etc/apt/sources.list.d/{name}.sources";
         var suite = !string.IsNullOrWhiteSpace(source.Suite) ? source.Suite! : await DetectCodenameAsync(ct);
         var components = !string.IsNullOrWhiteSpace(source.Components) ? source.Components! : "stable";
@@ -90,19 +89,65 @@ public sealed class AptManager : IPackageManager
             ? source.Architectures!
             : await DetectArchitectureAsync(ct);
 
-        await EnsureDirAsync(Path.GetDirectoryName(keyringPath)!, ct);
-        await DownloadKeyAsync(source.KeyUrl!, keyringPath, ct);
+        var tempKey = await FetchKeyToTempAsync(source.KeyUrl!, ct);
+        try
+        {
+            var isAscii = await IsAsciiArmoredAsync(tempKey, ct);
+            var keyringPath = !string.IsNullOrWhiteSpace(source.SignedBy)
+                ? source.SignedBy!
+                : $"/etc/apt/keyrings/{name}.{(isAscii ? "asc" : "gpg")}";
 
-        var deb822 = $"""
-            Types: deb
-            URIs: {source.Uri}
-            Suites: {suite}
-            Components: {components}
-            Architectures: {architectures}
-            Signed-By: {keyringPath}
+            await EnsureDirAsync(Path.GetDirectoryName(keyringPath)!, ct);
+            await InstallRootFileAsync(tempKey, keyringPath, "0644", ct);
 
-            """;
-        await WriteRootFileAsync(sourcesPath, deb822, "0644", ct);
+            var deb822 = $"""
+                Types: deb
+                URIs: {source.Uri}
+                Suites: {suite}
+                Components: {components}
+                Architectures: {architectures}
+                Signed-By: {keyringPath}
+
+                """;
+            await WriteRootFileAsync(sourcesPath, deb822, "0644", ct);
+        }
+        finally
+        {
+            try { File.Delete(tempKey); } catch { }
+        }
+    }
+
+    private async Task EnableForeignArchitecturesAsync(CancellationToken ct)
+    {
+        var requested = _sources
+            .Select(s => s.Source.Architectures)
+            .Where(a => !string.IsNullOrWhiteSpace(a))
+            .SelectMany(a => a!.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        if (requested.Count == 0) return;
+
+        var host = await DetectArchitectureAsync(ct);
+        requested.Remove(host);
+        if (requested.Count == 0) return;
+
+        var existing = await GetForeignArchitecturesAsync(ct);
+        foreach (var arch in requested)
+        {
+            if (existing.Contains(arch)) continue;
+            var add = await Sudo.RunAsync("dpkg", ["--add-architecture", arch], ct);
+            if (add.ExitCode != 0)
+                throw new InvalidOperationException(
+                    $"dpkg --add-architecture {arch} failed: {add.StdErr.Trim()}");
+        }
+    }
+
+    private static async Task<HashSet<string>> GetForeignArchitecturesAsync(CancellationToken ct)
+    {
+        var result = await ProcessRunner.RunAsync("dpkg", ["--print-foreign-architectures"], ct);
+        if (result.ExitCode != 0) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return result.StdOut
+            .Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
     }
 
     private static async Task EnsureDirAsync(string path, CancellationToken ct)
@@ -112,29 +157,36 @@ public sealed class AptManager : IPackageManager
             throw new InvalidOperationException($"failed to create {path}: {result.StdErr.Trim()}");
     }
 
-    private static async Task DownloadKeyAsync(string url, string destination, CancellationToken ct)
+    private static async Task<string> FetchKeyToTempAsync(string url, CancellationToken ct)
     {
         using var response = await Http.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, ct);
         if (!response.IsSuccessStatusCode)
             throw new InvalidOperationException($"download {url} failed: HTTP {(int)response.StatusCode}");
 
-        var tempPath = Path.Combine(Path.GetTempPath(), $"depend-key-{Guid.NewGuid():N}.asc");
-        try
-        {
-            await using (var src = await response.Content.ReadAsStreamAsync(ct))
-            await using (var dst = File.Create(tempPath))
-                await src.CopyToAsync(dst, ct);
+        var tempPath = Path.Combine(Path.GetTempPath(), $"depend-key-{Guid.NewGuid():N}");
+        await using var src = await response.Content.ReadAsStreamAsync(ct);
+        await using var dst = File.Create(tempPath);
+        await src.CopyToAsync(dst, ct);
+        return tempPath;
+    }
 
-            var install = await Sudo.RunAsync(
-                "install", ["-m", "0644", "-o", "root", "-g", "root", tempPath, destination], ct);
-            if (install.ExitCode != 0)
-                throw new InvalidOperationException(
-                    $"failed to install keyring at {destination}: {install.StdErr.Trim()}");
-        }
-        finally
-        {
-            try { File.Delete(tempPath); } catch { }
-        }
+    private static async Task<bool> IsAsciiArmoredAsync(string path, CancellationToken ct)
+    {
+        const string marker = "-----BEGIN PGP";
+        var buffer = new byte[marker.Length];
+        await using var stream = File.OpenRead(path);
+        var read = await stream.ReadAsync(buffer.AsMemory(0, buffer.Length), ct);
+        if (read < marker.Length) return false;
+        return System.Text.Encoding.ASCII.GetString(buffer) == marker;
+    }
+
+    private static async Task InstallRootFileAsync(string source, string destination, string mode, CancellationToken ct)
+    {
+        var install = await Sudo.RunAsync(
+            "install", ["-m", mode, "-o", "root", "-g", "root", source, destination], ct);
+        if (install.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"failed to install {destination}: {install.StdErr.Trim()}");
     }
 
     private static async Task WriteRootFileAsync(string destination, string contents, string mode, CancellationToken ct)

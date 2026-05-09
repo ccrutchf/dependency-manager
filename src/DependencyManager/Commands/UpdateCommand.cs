@@ -77,6 +77,7 @@ public static class UpdateCommand
         new ScriptManager(),
         new VsCodeManager(),
         new CargoManager(),
+        new NvmManager(),
     ];
 
     private static bool RequiresSudo(IPackageManager manager) =>

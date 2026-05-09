@@ -59,3 +59,11 @@ user-tools:
     cargo:
       check: command -v cargo
       install: curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --no-modify-path
+    nvm:
+      check: test -s "$HOME/.nvm/nvm.sh"
+      install: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+  nvm:
+    "lts/*":
+      dependencies: [nvm]
+    "22":
+      dependencies: [nvm]

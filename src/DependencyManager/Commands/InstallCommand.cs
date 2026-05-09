@@ -86,5 +86,6 @@ public static class InstallCommand
         new ScriptManager(),
         new VsCodeManager(),
         new CargoManager(),
+        new NvmManager(),
     ];
 }
