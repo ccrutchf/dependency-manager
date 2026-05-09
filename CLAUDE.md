@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Targets .NET 10 (`net10.0`). Solution file: `DependencyManager.sln`. Assembly name is `depend` (not `DependencyManager`).
 
-- Build: `dotnet build` (Debug) or `dotnet build -c Release` (Release enables single-file self-contained publish settings)
+- Build: `dotnet build` (Debug) or `dotnet build -c Release`. Single-file self-contained settings are scoped to `dotnet publish` (`_IsPublishing=true`), so plain builds don't need a RID.
 - Run CLI against the example config: `dotnet run --project src/DependencyManager -- plan --config examples/packages.yaml`
 - Run all tests: `dotnet test`
 - Run one test class: `dotnet test --filter "FullyQualifiedName~PlannerTests"`
