@@ -10,7 +10,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         new(StringComparer.OrdinalIgnoreCase) { "platform", "architecture", "version" };
 
     private static readonly HashSet<string> ProviderKeys =
-        new(StringComparer.OrdinalIgnoreCase) { "apt", "snap", "flatpak", "deb", "pip", "pipx", "script", "vscode", "cargo" };
+        new(StringComparer.OrdinalIgnoreCase) { "apt", "snap", "flatpak", "deb", "pip", "pipx", "script", "vscode", "cargo", "nvm" };
 
     private const string PpasKey = "ppas";
     private const string AptSourcesKey = "apt_sources";
@@ -35,6 +35,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         Dictionary<string, PackageSpec>? script = null;
         Dictionary<string, PackageSpec>? vscode = null;
         Dictionary<string, PackageSpec>? cargo = null;
+        Dictionary<string, PackageSpec>? nvm = null;
 
         while (!parser.TryConsume<MappingEnd>(out _))
         {
@@ -74,11 +75,12 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
                     case "script": script = section; break;
                     case "vscode": vscode = section; break;
                     case "cargo": cargo = section; break;
+                    case "nvm": nvm = section; break;
                 }
             }
             else
             {
-                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo)");
+                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm)");
                 _ = rootDeserializer(typeof(object));
             }
         }
@@ -99,6 +101,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             Script = script,
             Vscode = vscode,
             Cargo = cargo,
+            Nvm = nvm,
         };
     }
 

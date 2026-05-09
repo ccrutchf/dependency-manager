@@ -25,6 +25,7 @@ public static class Planner
             Flatten(block.Script, ManagerKind.Script, blockName, resolved);
             Flatten(block.Vscode, ManagerKind.VsCode, blockName, resolved);
             Flatten(block.Cargo, ManagerKind.Cargo, blockName, resolved);
+            Flatten(block.Nvm, ManagerKind.Nvm, blockName, resolved);
 
             if (block.AptSources is not null)
             {

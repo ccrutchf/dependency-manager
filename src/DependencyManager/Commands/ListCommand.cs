@@ -17,6 +17,7 @@ public static class ListCommand
             new ScriptManager(),
             new VsCodeManager(),
             new CargoManager(),
+            new NvmManager(),
         };
 
         foreach (var m in managers)

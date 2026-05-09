@@ -197,6 +197,24 @@ public class ConfigLoaderTests
     }
 
     [Fact]
+    public void Parses_nvm_block()
+    {
+        const string yaml = """
+            linux:
+              platform: linux
+              nvm:
+                "20":
+                "lts/iron":
+            """;
+
+        var config = ConfigLoader.Parse(yaml);
+        var block = config.Blocks["linux"];
+        block.Nvm.ShouldNotBeNull();
+        block.Nvm.ShouldContainKey("20");
+        block.Nvm.ShouldContainKey("lts/iron");
+    }
+
+    [Fact]
     public void Parses_apt_sources_block()
     {
         const string yaml = """

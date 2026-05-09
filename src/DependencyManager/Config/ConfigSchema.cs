@@ -11,6 +11,7 @@ public enum ManagerKind
     Script,
     VsCode,
     Cargo,
+    Nvm,
 }
 
 public sealed record ConfigFile(Dictionary<string, Block> Blocks);
@@ -33,6 +34,7 @@ public sealed record Block
     public Dictionary<string, PackageSpec>? Script { get; init; }
     public Dictionary<string, PackageSpec>? Vscode { get; init; }
     public Dictionary<string, PackageSpec>? Cargo { get; init; }
+    public Dictionary<string, PackageSpec>? Nvm { get; init; }
 }
 
 public sealed record PackageSpec
