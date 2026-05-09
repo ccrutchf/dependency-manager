@@ -276,6 +276,76 @@ public class PlannerTests
     }
 
     [Fact]
+    public void Cargo_packages_flow_through_plan()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Cargo = new Dictionary<string, PackageSpec>
+                {
+                    ["ripgrep"] = new(),
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(1);
+        plan[0].Manager.ShouldBe(ManagerKind.Cargo);
+        plan[0].Id.ShouldBe("ripgrep");
+    }
+
+    [Fact]
+    public void Nvm_packages_flow_through_plan()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Nvm = new Dictionary<string, PackageSpec>
+                {
+                    ["20"] = new(),
+                    ["lts/iron"] = new(),
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+        plan.Count.ShouldBe(2);
+        plan.ShouldAllBe(p => p.Manager == ManagerKind.Nvm);
+        plan.Select(p => p.Id).ShouldBe(new[] { "20", "lts/iron" }, ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Topo_sort_orders_dependencies_across_manager_kinds()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Script = new Dictionary<string, PackageSpec>
+                {
+                    ["nvm"] = new() { Check = "test", Install = "echo" },
+                },
+                Nvm = new Dictionary<string, PackageSpec>
+                {
+                    ["20"] = new() { Dependencies = new List<string> { "nvm" } },
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages.ToList();
+        var scriptIdx = plan.FindIndex(p => p.Manager == ManagerKind.Script && p.Id == "nvm");
+        var nvmIdx = plan.FindIndex(p => p.Manager == ManagerKind.Nvm && p.Id == "20");
+        scriptIdx.ShouldBeGreaterThanOrEqualTo(0);
+        nvmIdx.ShouldBeGreaterThanOrEqualTo(0);
+        scriptIdx.ShouldBeLessThan(nvmIdx);
+    }
+
+    [Fact]
     public void Apt_sources_flow_through_plan_in_first_seen_order()
     {
         var config = new ConfigFile(new Dictionary<string, Block>

@@ -58,6 +58,83 @@ public class RootCheckTests
     }
 
     [Fact]
+    public void Apt_package_requires_root()
+    {
+        var plan = new ResolvedPlan(
+            new[] { new ResolvedPackage(ManagerKind.Apt, "curl", new PackageSpec(), "b") },
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Snap_package_requires_root()
+    {
+        var plan = new ResolvedPlan(
+            new[] { new ResolvedPackage(ManagerKind.Snap, "code", new PackageSpec(), "b") },
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Deb_package_requires_root()
+    {
+        var plan = new ResolvedPlan(
+            new[] { new ResolvedPackage(ManagerKind.Deb, "slack", new PackageSpec(), "b") },
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Apt_ppa_in_plan_requires_root()
+    {
+        var plan = new ResolvedPlan(
+            Array.Empty<ResolvedPackage>(),
+            new[] { "ppa:git-core/ppa" },
+            Array.Empty<ResolvedAptSource>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Cargo_package_does_not_require_root()
+    {
+        var plan = new ResolvedPlan(
+            new[] { new ResolvedPackage(ManagerKind.Cargo, "ripgrep", new PackageSpec(), "b") },
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Nvm_package_does_not_require_root()
+    {
+        var plan = new ResolvedPlan(
+            new[] { new ResolvedPackage(ManagerKind.Nvm, "20", new PackageSpec(), "b") },
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Empty_plan_does_not_require_root()
+    {
+        var plan = new ResolvedPlan(
+            Array.Empty<ResolvedPackage>(),
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
+    }
+
+    [Fact]
     public void Flatpak_package_with_scope_system_requires_root()
     {
         var plan = new ResolvedPlan(
