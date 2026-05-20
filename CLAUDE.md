@@ -31,6 +31,8 @@ The pipeline has three stages: **load → plan → run**. Each stage has a singl
 
 `Program.cs` uses `System.CommandLine` 2.0 beta 4. Subcommands: `plan`, `install` (supports `--fail-fast`), `test`, `list`, `update`. `plan`/`install`/`test` accept `--config`/`-c` (default `packages.yaml`); `list` and `update` take no config. Commands live in `Commands/` as static classes with `Run`/`RunAsync`.
 
+`update` runs `UpdateAllAsync` on every available `IPackageManager`. On NixOS (detected by `nixos-rebuild` on `PATH`), it also runs `sudo nixos-rebuild switch --upgrade` *first* so subsequent user-scope updates execute against the new system generation. This system-wide updater is intentionally inline in `UpdateCommand` rather than another `IPackageManager` — that interface is per-package and nixos-rebuild has no Install/IsInstalled semantics; treat future per-system updaters (e.g. `brew upgrade`, `winget upgrade --all`) the same way until there are enough of them to warrant an abstraction.
+
 ## Tests
 
 xUnit + Shouldly. Tests construct `ConfigFile`/`Block` records directly rather than parsing YAML, except `ConfigLoaderTests` which exercises the YAML pipeline end-to-end. There are no integration tests that hit real package managers — the `IPackageManager` implementations are tested manually.

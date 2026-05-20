@@ -17,15 +17,20 @@ public static class UpdateCommand
 
         var managers = BuildManagers();
         var available = managers.Where(m => m.IsAvailable()).ToList();
-        if (available.Count == 0)
+        var nixosAvailable = OperatingSystem.IsLinux() && PathLookup.Exists("nixos-rebuild");
+
+        if (available.Count == 0 && !nixosAvailable)
         {
             Console.WriteLine("no package managers available on this machine");
             return 0;
         }
 
-        Console.WriteLine($"available providers: {string.Join(", ", available.Select(m => m.Kind.ToString().ToLowerInvariant()))}");
+        var providerLabels = new List<string>();
+        if (nixosAvailable) providerLabels.Add("nixos");
+        providerLabels.AddRange(available.Select(m => m.Kind.ToString().ToLowerInvariant()));
+        Console.WriteLine($"available providers: {string.Join(", ", providerLabels)}");
 
-        if (available.Any(RequiresSudo))
+        if (nixosAvailable || available.Any(RequiresSudo))
         {
             Console.WriteLine("this update includes privileged operations — priming sudo...");
             if (!await Sudo.PrimeAsync(ct))
@@ -37,11 +42,30 @@ public static class UpdateCommand
         Console.WriteLine();
 
         var succeeded = 0;
-        var failures = new List<(ManagerKind Kind, string Reason)>();
+        var failures = new List<(string Kind, string Reason)>();
+
+        if (nixosAvailable)
+        {
+            Console.WriteLine("  [update]  nixos");
+            try
+            {
+                var result = await Sudo.RunAsync("nixos-rebuild", ["switch", "--upgrade"], ct);
+                if (result.ExitCode != 0)
+                    throw new InvalidOperationException(
+                        $"nixos-rebuild switch --upgrade failed: {(result.StdErr.Length > 0 ? result.StdErr.Trim() : result.StdOut.Trim())}");
+                succeeded++;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [FAIL]    nixos  {ex.Message}");
+                failures.Add(("nixos", ex.Message));
+            }
+        }
 
         foreach (var manager in available)
         {
-            Console.WriteLine($"  [update]  {manager.Kind.ToString().ToLowerInvariant()}");
+            var label = manager.Kind.ToString().ToLowerInvariant();
+            Console.WriteLine($"  [update]  {label}");
             try
             {
                 await manager.UpdateAllAsync(ct);
@@ -49,8 +73,8 @@ public static class UpdateCommand
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"  [FAIL]    {manager.Kind.ToString().ToLowerInvariant()}  {ex.Message}");
-                failures.Add((manager.Kind, ex.Message));
+                Console.WriteLine($"  [FAIL]    {label}  {ex.Message}");
+                failures.Add((label, ex.Message));
             }
         }
 
