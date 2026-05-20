@@ -1,3 +1,4 @@
+using DependencyManager.Config;
 using DependencyManager.Managers;
 
 namespace DependencyManager.Commands;
@@ -18,6 +19,11 @@ public static class ListCommand
             new VsCodeManager(),
             new CargoManager(),
             new NvmManager(),
+            new BrowserExtensionManager(ManagerKind.Firefox),
+            new BrowserExtensionManager(ManagerKind.Zen),
+            new BrowserExtensionManager(ManagerKind.Chrome),
+            new BrowserExtensionManager(ManagerKind.Chromium),
+            new BrowserExtensionManager(ManagerKind.Brave),
         };
 
         foreach (var m in managers)

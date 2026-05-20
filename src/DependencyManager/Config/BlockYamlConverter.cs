@@ -10,7 +10,11 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         new(StringComparer.OrdinalIgnoreCase) { "platform", "architecture", "version" };
 
     private static readonly HashSet<string> ProviderKeys =
-        new(StringComparer.OrdinalIgnoreCase) { "apt", "snap", "flatpak", "deb", "pip", "pipx", "script", "vscode", "cargo", "nvm" };
+        new(StringComparer.OrdinalIgnoreCase)
+        {
+            "apt", "snap", "flatpak", "deb", "pip", "pipx", "script", "vscode", "cargo", "nvm",
+            "firefox", "zen", "chrome", "chromium", "brave",
+        };
 
     private const string PpasKey = "ppas";
     private const string AptSourcesKey = "apt_sources";
@@ -38,6 +42,11 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         Dictionary<string, PackageSpec>? vscode = null;
         Dictionary<string, PackageSpec>? cargo = null;
         Dictionary<string, PackageSpec>? nvm = null;
+        Dictionary<string, PackageSpec>? firefox = null;
+        Dictionary<string, PackageSpec>? zen = null;
+        Dictionary<string, PackageSpec>? chrome = null;
+        Dictionary<string, PackageSpec>? chromium = null;
+        Dictionary<string, PackageSpec>? brave = null;
 
         while (!parser.TryConsume<MappingEnd>(out _))
         {
@@ -82,11 +91,16 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
                     case "vscode": vscode = section; break;
                     case "cargo": cargo = section; break;
                     case "nvm": nvm = section; break;
+                    case "firefox": firefox = section; break;
+                    case "zen": zen = section; break;
+                    case "chrome": chrome = section; break;
+                    case "chromium": chromium = section; break;
+                    case "brave": brave = section; break;
                 }
             }
             else
             {
-                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources/requires or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm)");
+                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources/requires or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm/firefox/zen/chrome/chromium/brave)");
                 _ = rootDeserializer(typeof(object));
             }
         }
@@ -109,6 +123,11 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             Vscode = vscode,
             Cargo = cargo,
             Nvm = nvm,
+            Firefox = firefox,
+            Zen = zen,
+            Chrome = chrome,
+            Chromium = chromium,
+            Brave = brave,
         };
     }
 

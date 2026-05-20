@@ -271,4 +271,34 @@ public class ConfigLoaderTests
         var config = ConfigLoader.Parse(yaml);
         config.Blocks["focal"].Version.ShouldBe("5.15");
     }
+
+    [Fact]
+    public void Parses_browser_extension_blocks_with_mode_and_source()
+    {
+        const string yaml = """
+            browser-extensions:
+              platform: linux
+              zen:
+                uBlock0@raymondhill.net:
+                  source: ublock-origin
+              brave:
+                cjpalhdlnbpafiamejdnhcphjbkeiagm:
+                  mode: force
+              firefox:
+                uBlock0@raymondhill.net:
+                  url: https://example/ublock.xpi
+            """;
+
+        var config = ConfigLoader.Parse(yaml);
+        var block = config.Blocks["browser-extensions"];
+
+        block.Zen.ShouldNotBeNull();
+        block.Zen["uBlock0@raymondhill.net"].Source.ShouldBe("ublock-origin");
+
+        block.Brave.ShouldNotBeNull();
+        block.Brave["cjpalhdlnbpafiamejdnhcphjbkeiagm"].Mode.ShouldBe("force");
+
+        block.Firefox.ShouldNotBeNull();
+        block.Firefox["uBlock0@raymondhill.net"].Url.ShouldBe("https://example/ublock.xpi");
+    }
 }

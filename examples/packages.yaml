@@ -52,6 +52,30 @@ vscode-extensions:
     rust-lang.rust-analyzer:
     github.copilot:
 
+browser-extensions:
+  platform: linux
+  # Browsers ship no extension-install CLI, so depend writes enterprise policies.
+  # Each browser is detected across native/snap/flatpak installs; absent browsers
+  # are reported as unavailable. Default mode is normal_installed (auto-installed,
+  # user can disable); set `mode: force` to lock it on, or allowed/blocked.
+  # Firefox-family keys are the addon id; `source:` is the AMO slug used to build
+  # the .xpi url (or give an explicit `url:`).
+  zen:
+    uBlock0@raymondhill.net:
+      source: ublock-origin
+  firefox:
+    uBlock0@raymondhill.net:
+      source: ublock-origin
+  # Chromium-family keys are the 32-char Chrome Web Store id; the store update url
+  # is used by default, so no url is needed for store extensions.
+  brave:
+    cjpalhdlnbpafiamejdnhcphjbkeiagm:   # uBlock Origin
+  chromium:
+    cjpalhdlnbpafiamejdnhcphjbkeiagm:
+  chrome:
+    cjpalhdlnbpafiamejdnhcphjbkeiagm:
+      mode: force
+
 user-tools:
   platform: linux
   script:

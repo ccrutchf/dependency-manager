@@ -50,7 +50,7 @@ public static class PlanCommand
         }
 
         if (RootCheck.PlanRequiresSudo(plan))
-            Console.WriteLine("note: this plan will invoke sudo to install (apt/snap/PPAs or system-scope packages present)");
+            Console.WriteLine("note: this plan will invoke sudo to install (apt/snap/PPAs, browser extension policies, or system-scope packages present)");
 
         return 0;
     }

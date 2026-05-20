@@ -12,6 +12,11 @@ public enum ManagerKind
     VsCode,
     Cargo,
     Nvm,
+    Firefox,
+    Zen,
+    Chrome,
+    Chromium,
+    Brave,
 }
 
 public sealed record ConfigFile(Dictionary<string, Block> Blocks);
@@ -37,6 +42,15 @@ public sealed record Block
     public Dictionary<string, PackageSpec>? Vscode { get; init; }
     public Dictionary<string, PackageSpec>? Cargo { get; init; }
     public Dictionary<string, PackageSpec>? Nvm { get; init; }
+
+    // Browser-extension blocks. Each maps an extension id -> spec; the id is the
+    // Firefox addon id (e.g. uBlock0@raymondhill.net) or the 32-char Chrome Web
+    // Store id, depending on the browser's policy family.
+    public Dictionary<string, PackageSpec>? Firefox { get; init; }
+    public Dictionary<string, PackageSpec>? Zen { get; init; }
+    public Dictionary<string, PackageSpec>? Chrome { get; init; }
+    public Dictionary<string, PackageSpec>? Chromium { get; init; }
+    public Dictionary<string, PackageSpec>? Brave { get; init; }
 }
 
 public sealed record PackageSpec
@@ -50,6 +64,10 @@ public sealed record PackageSpec
     public string? Scope { get; init; }
     public string? Check { get; init; }
     public string? Install { get; init; }
+
+    // Browser-extension installation mode: force | normal | allowed | blocked.
+    // Defaults to normal_installed (auto-installed, user can disable).
+    public string? Mode { get; init; }
 
     public bool? UserScope => Scope?.ToLowerInvariant() switch
     {

@@ -27,6 +27,11 @@ public static class Planner
             Flatten(block.Vscode, ManagerKind.VsCode, blockName, resolved);
             Flatten(block.Cargo, ManagerKind.Cargo, blockName, resolved);
             Flatten(block.Nvm, ManagerKind.Nvm, blockName, resolved);
+            Flatten(block.Firefox, ManagerKind.Firefox, blockName, resolved);
+            Flatten(block.Zen, ManagerKind.Zen, blockName, resolved);
+            Flatten(block.Chrome, ManagerKind.Chrome, blockName, resolved);
+            Flatten(block.Chromium, ManagerKind.Chromium, blockName, resolved);
+            Flatten(block.Brave, ManagerKind.Brave, blockName, resolved);
 
             if (block.Requires is not null)
             {

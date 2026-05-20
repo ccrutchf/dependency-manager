@@ -499,4 +499,52 @@ public class PlannerTests
         plan.AptPpas.Count.ShouldBe(0);
         plan.AptSources.Count.ShouldBe(0);
     }
+
+    [Fact]
+    public void Flattens_browser_extension_sections_into_their_manager_kinds()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["browsers"] = new()
+            {
+                Platform = "linux",
+                Firefox = new Dictionary<string, PackageSpec> { ["uBlock0@raymondhill.net"] = new() },
+                Zen = new Dictionary<string, PackageSpec> { ["uBlock0@raymondhill.net"] = new() },
+                Chrome = new Dictionary<string, PackageSpec> { ["cjpalhdlnbpafiamejdnhcphjbkeiagm"] = new() },
+                Chromium = new Dictionary<string, PackageSpec> { ["cjpalhdlnbpafiamejdnhcphjbkeiagm"] = new() },
+                Brave = new Dictionary<string, PackageSpec> { ["cjpalhdlnbpafiamejdnhcphjbkeiagm"] = new() },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+
+        plan.Select(p => p.Manager).ShouldBe(
+            new[]
+            {
+                ManagerKind.Firefox, ManagerKind.Zen, ManagerKind.Chrome,
+                ManagerKind.Chromium, ManagerKind.Brave,
+            },
+            ignoreOrder: true);
+    }
+
+    [Fact]
+    public void Same_extension_in_two_browsers_does_not_collide()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["browsers"] = new()
+            {
+                Platform = "linux",
+                Firefox = new Dictionary<string, PackageSpec> { ["uBlock0@raymondhill.net"] = new() },
+                Zen = new Dictionary<string, PackageSpec> { ["uBlock0@raymondhill.net"] = new() },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+
+        // Distinct ManagerKinds keep the (kind, id) keys separate, so both survive.
+        plan.Count.ShouldBe(2);
+        plan.ShouldContain(p => p.Manager == ManagerKind.Firefox);
+        plan.ShouldContain(p => p.Manager == ManagerKind.Zen);
+    }
 }

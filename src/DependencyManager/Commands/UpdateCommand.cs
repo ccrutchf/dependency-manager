@@ -102,6 +102,11 @@ public static class UpdateCommand
         new VsCodeManager(),
         new CargoManager(),
         new NvmManager(),
+        new BrowserExtensionManager(ManagerKind.Firefox),
+        new BrowserExtensionManager(ManagerKind.Zen),
+        new BrowserExtensionManager(ManagerKind.Chrome),
+        new BrowserExtensionManager(ManagerKind.Chromium),
+        new BrowserExtensionManager(ManagerKind.Brave),
     ];
 
     private static bool RequiresSudo(IPackageManager manager) =>

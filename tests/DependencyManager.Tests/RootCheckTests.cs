@@ -156,4 +156,21 @@ public class RootCheckTests
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }
+
+    [Theory]
+    [InlineData(ManagerKind.Firefox)]
+    [InlineData(ManagerKind.Zen)]
+    [InlineData(ManagerKind.Chrome)]
+    [InlineData(ManagerKind.Chromium)]
+    [InlineData(ManagerKind.Brave)]
+    public void Browser_extension_package_requires_root(ManagerKind kind)
+    {
+        var plan = new ResolvedPlan(
+            new[] { new ResolvedPackage(kind, "ext-id", new PackageSpec(), "b") },
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
+    }
 }
