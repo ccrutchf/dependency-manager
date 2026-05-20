@@ -398,6 +398,92 @@ public class PlannerTests
     }
 
     [Fact]
+    public void Requires_marked_satisfied_when_binary_resolves_on_path()
+    {
+        var prev = PathLookup.Probe;
+        PathLookup.Probe = name => name == "code";
+        try
+        {
+            var config = new ConfigFile(new Dictionary<string, Block>
+            {
+                ["vscode"] = new()
+                {
+                    Platform = "all",
+                    Requires = new List<string> { "code" },
+                    Vscode = new Dictionary<string, PackageSpec> { ["ms-python.python"] = new() },
+                },
+            });
+
+            var plan = Planner.Plan(config, Linux);
+            plan.Requirements.Count.ShouldBe(1);
+            plan.Requirements[0].Name.ShouldBe("code");
+            plan.Requirements[0].BlockName.ShouldBe("vscode");
+            plan.Requirements[0].Satisfied.ShouldBeTrue();
+        }
+        finally
+        {
+            PathLookup.Probe = prev;
+        }
+    }
+
+    [Fact]
+    public void Requires_marked_unsatisfied_when_binary_missing()
+    {
+        var prev = PathLookup.Probe;
+        PathLookup.Probe = _ => false;
+        try
+        {
+            var config = new ConfigFile(new Dictionary<string, Block>
+            {
+                ["vscode"] = new()
+                {
+                    Platform = "all",
+                    Requires = new List<string> { "code" },
+                    Vscode = new Dictionary<string, PackageSpec> { ["ms-python.python"] = new() },
+                },
+            });
+
+            var plan = Planner.Plan(config, Linux);
+            plan.Requirements.Count.ShouldBe(1);
+            plan.Requirements[0].Satisfied.ShouldBeFalse();
+        }
+        finally
+        {
+            PathLookup.Probe = prev;
+        }
+    }
+
+    [Fact]
+    public void Requires_only_collected_from_matching_blocks()
+    {
+        var prev = PathLookup.Probe;
+        PathLookup.Probe = _ => true;
+        try
+        {
+            var config = new ConfigFile(new Dictionary<string, Block>
+            {
+                ["linux-block"] = new()
+                {
+                    Platform = "linux",
+                    Requires = new List<string> { "code" },
+                },
+                ["windows-block"] = new()
+                {
+                    Platform = "windows",
+                    Requires = new List<string> { "should-not-appear" },
+                },
+            });
+
+            var plan = Planner.Plan(config, Linux);
+            plan.Requirements.Select(r => r.Name).ShouldBe(new[] { "code" });
+        }
+        finally
+        {
+            PathLookup.Probe = prev;
+        }
+    }
+
+    [Fact]
     public void Ppas_empty_when_no_blocks_declare_them()
     {
         var config = new ConfigFile(new Dictionary<string, Block>

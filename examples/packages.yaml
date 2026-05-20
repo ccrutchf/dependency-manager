@@ -44,7 +44,9 @@ linux-desktop:
     cargo-update:
 
 vscode-extensions:
-  platform: linux
+  platform: all
+  requires:
+    - code
   vscode:
     ms-python.python:
     rust-lang.rust-analyzer:

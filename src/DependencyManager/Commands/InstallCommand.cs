@@ -19,6 +19,15 @@ public static class InstallCommand
         var platform = PlatformInfo.Current();
         var plan = Planner.Plan(config, platform);
 
+        var unsatisfied = plan.Requirements.Where(r => !r.Satisfied).ToList();
+        if (unsatisfied.Count > 0)
+        {
+            Console.Error.WriteLine($"missing {unsatisfied.Count} required prerequisite(s):");
+            foreach (var r in unsatisfied)
+                Console.Error.WriteLine($"  {r.Name}  (required by block '{r.BlockName}')");
+            return 1;
+        }
+
         if (plan.Packages.Count == 0)
         {
             Console.WriteLine("no packages match this platform");
@@ -72,7 +81,8 @@ public static class InstallCommand
         return new ResolvedPlan(
             missing,
             hasMissingApt ? plan.AptPpas : Array.Empty<string>(),
-            hasMissingApt ? plan.AptSources : Array.Empty<ResolvedAptSource>());
+            hasMissingApt ? plan.AptSources : Array.Empty<ResolvedAptSource>(),
+            plan.Requirements);
     }
 
     internal static IPackageManager[] BuildManagers(ResolvedPlan plan) =>

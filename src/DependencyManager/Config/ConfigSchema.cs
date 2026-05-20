@@ -25,6 +25,8 @@ public sealed record Block
     public List<string>? Ppas { get; init; }
     public Dictionary<string, AptSource>? AptSources { get; init; }
 
+    public List<string>? Requires { get; init; }
+
     public Dictionary<string, PackageSpec>? Apt { get; init; }
     public Dictionary<string, PackageSpec>? Snap { get; init; }
     public Dictionary<string, PackageSpec>? Flatpak { get; init; }
@@ -75,7 +77,10 @@ public sealed record ResolvedPackage(
 
 public sealed record ResolvedAptSource(string Name, AptSource Source, string BlockName);
 
+public sealed record ResolvedRequirement(string Name, string BlockName, bool Satisfied);
+
 public sealed record ResolvedPlan(
     IReadOnlyList<ResolvedPackage> Packages,
     IReadOnlyList<string> AptPpas,
-    IReadOnlyList<ResolvedAptSource> AptSources);
+    IReadOnlyList<ResolvedAptSource> AptSources,
+    IReadOnlyList<ResolvedRequirement> Requirements);

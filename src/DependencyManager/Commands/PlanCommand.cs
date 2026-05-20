@@ -19,6 +19,15 @@ public static class PlanCommand
         var plan = Planner.Plan(config, platform);
 
         Console.WriteLine($"platform: {platform.Os}/{platform.Architecture} ({platform.Version})");
+        if (plan.Requirements.Count > 0)
+        {
+            Console.WriteLine($"requires ({plan.Requirements.Count}):");
+            foreach (var r in plan.Requirements)
+            {
+                var mark = r.Satisfied ? "ok     " : "MISSING";
+                Console.WriteLine($"  [{mark}] {r.Name}  (from {r.BlockName})");
+            }
+        }
         if (plan.AptPpas.Count > 0)
         {
             Console.WriteLine($"ppas ({plan.AptPpas.Count}):");

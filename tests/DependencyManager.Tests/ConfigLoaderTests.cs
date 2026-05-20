@@ -241,6 +241,23 @@ public class ConfigLoaderTests
     }
 
     [Fact]
+    public void Parses_block_level_requires_list()
+    {
+        const string yaml = """
+            vscode-extensions:
+              platform: all
+              requires:
+                - code
+                - git
+              vscode:
+                ms-python.python:
+            """;
+
+        var config = ConfigLoader.Parse(yaml);
+        config.Blocks["vscode-extensions"].Requires.ShouldBe(new[] { "code", "git" });
+    }
+
+    [Fact]
     public void Accepts_version_filter()
     {
         const string yaml = """

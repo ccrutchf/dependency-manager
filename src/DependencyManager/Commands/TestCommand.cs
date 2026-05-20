@@ -18,8 +18,19 @@ public static class TestCommand
         var platform = PlatformInfo.Current();
         var plan = Planner.Plan(config, platform);
 
+        var unsatisfied = plan.Requirements.Where(r => !r.Satisfied).ToList();
         var managers = InstallCommand.BuildManagers(plan);
         var runner = new Runner.Runner(managers);
-        return await runner.TestAsync(plan.Packages, ct);
+        var packageResult = await runner.TestAsync(plan.Packages, ct);
+
+        if (unsatisfied.Count > 0)
+        {
+            Console.WriteLine($"{unsatisfied.Count} missing prerequisite(s):");
+            foreach (var r in unsatisfied)
+                Console.WriteLine($"  {r.Name}  (required by block '{r.BlockName}')");
+            return 1;
+        }
+
+        return packageResult;
     }
 }

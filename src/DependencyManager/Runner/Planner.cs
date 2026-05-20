@@ -12,6 +12,7 @@ public static class Planner
         var seenPpas = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var aptSources = new Dictionary<string, ResolvedAptSource>(StringComparer.OrdinalIgnoreCase);
         var aptSourceOrder = new List<string>();
+        var requirements = new List<ResolvedRequirement>();
 
         foreach (var (blockName, block) in config.Blocks)
         {
@@ -26,6 +27,15 @@ public static class Planner
             Flatten(block.Vscode, ManagerKind.VsCode, blockName, resolved);
             Flatten(block.Cargo, ManagerKind.Cargo, blockName, resolved);
             Flatten(block.Nvm, ManagerKind.Nvm, blockName, resolved);
+
+            if (block.Requires is not null)
+            {
+                foreach (var name in block.Requires)
+                {
+                    if (string.IsNullOrWhiteSpace(name)) continue;
+                    requirements.Add(new ResolvedRequirement(name, blockName, PathLookup.Exists(name)));
+                }
+            }
 
             if (block.AptSources is not null)
             {
@@ -44,7 +54,7 @@ public static class Planner
         }
 
         var resolvedSources = aptSourceOrder.Select(n => aptSources[n]).ToList();
-        return new ResolvedPlan(TopoSort(resolved.Values.ToList()), ppas, resolvedSources);
+        return new ResolvedPlan(TopoSort(resolved.Values.ToList()), ppas, resolvedSources, requirements);
     }
 
     private static void Flatten(

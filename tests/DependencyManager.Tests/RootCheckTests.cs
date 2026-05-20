@@ -13,7 +13,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Pip, "httpie", new PackageSpec(), "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
     }
@@ -24,7 +25,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Pip, "httpie", new PackageSpec { Scope = "system" }, "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }
@@ -35,7 +37,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Script, "uv", new PackageSpec { Install = "echo hi" }, "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
     }
@@ -52,7 +55,8 @@ public class RootCheckTests
                     "docker",
                     new AptSource { KeyUrl = "https://x/gpg", Uri = "https://x" },
                     "b"),
-            });
+            },
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }
@@ -63,7 +67,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Apt, "curl", new PackageSpec(), "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }
@@ -74,7 +79,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Snap, "code", new PackageSpec(), "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }
@@ -85,7 +91,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Deb, "slack", new PackageSpec(), "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }
@@ -96,7 +103,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             Array.Empty<ResolvedPackage>(),
             new[] { "ppa:git-core/ppa" },
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }
@@ -107,7 +115,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Cargo, "ripgrep", new PackageSpec(), "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
     }
@@ -118,7 +127,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Nvm, "20", new PackageSpec(), "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
     }
@@ -129,7 +139,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             Array.Empty<ResolvedPackage>(),
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
     }
@@ -140,7 +151,8 @@ public class RootCheckTests
         var plan = new ResolvedPlan(
             new[] { new ResolvedPackage(ManagerKind.Flatpak, "org.example", new PackageSpec { Scope = "system" }, "b") },
             Array.Empty<string>(),
-            Array.Empty<ResolvedAptSource>());
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
 
         RootCheck.PlanRequiresSudo(plan).ShouldBeTrue();
     }

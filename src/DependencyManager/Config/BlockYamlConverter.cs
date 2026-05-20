@@ -14,6 +14,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
 
     private const string PpasKey = "ppas";
     private const string AptSourcesKey = "apt_sources";
+    private const string RequiresKey = "requires";
 
     public bool Accepts(Type type) => type == typeof(Block);
 
@@ -26,6 +27,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         string? version = null;
         List<string>? ppas = null;
         Dictionary<string, AptSource>? aptSources = null;
+        List<string>? requires = null;
         Dictionary<string, PackageSpec>? apt = null;
         Dictionary<string, PackageSpec>? snap = null;
         Dictionary<string, PackageSpec>? flatpak = null;
@@ -60,6 +62,10 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             {
                 aptSources = (Dictionary<string, AptSource>?)rootDeserializer(typeof(Dictionary<string, AptSource>));
             }
+            else if (string.Equals(key, RequiresKey, StringComparison.OrdinalIgnoreCase))
+            {
+                requires = (List<string>?)rootDeserializer(typeof(List<string>));
+            }
             else if (ProviderKeys.Contains(key))
             {
                 var section = (Dictionary<string, PackageSpec>?)rootDeserializer(typeof(Dictionary<string, PackageSpec>))
@@ -80,7 +86,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             }
             else
             {
-                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm)");
+                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources/requires or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm)");
                 _ = rootDeserializer(typeof(object));
             }
         }
@@ -92,6 +98,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             Version = version,
             Ppas = ppas,
             AptSources = aptSources,
+            Requires = requires,
             Apt = apt,
             Snap = snap,
             Flatpak = flatpak,
