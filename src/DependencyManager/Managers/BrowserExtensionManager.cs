@@ -45,7 +45,7 @@ public sealed class BrowserExtensionManager : IPackageManager
     public Task<bool> IsInstalledAsync(ResolvedPackage pkg, CancellationToken ct)
     {
         var spec = Spec();
-        var resolved = Resolve(spec, pkg.Spec);
+        var resolved = BrowserPolicy.ResolveExtension(spec.Family, pkg.Spec);
         if (!resolved.Valid) return Task.FromResult(false);
 
         var targets = ResolveTargets(spec);
@@ -62,7 +62,7 @@ public sealed class BrowserExtensionManager : IPackageManager
     public async Task InstallAsync(ResolvedPackage pkg, CancellationToken ct)
     {
         var spec = Spec();
-        var resolved = Resolve(spec, pkg.Spec);
+        var resolved = BrowserPolicy.ResolveExtension(spec.Family, pkg.Spec);
         if (!resolved.Valid)
             throw new InvalidOperationException(
                 $"{_kind} extension '{pkg.Id}' with mode '{resolved.Mode}' needs an install url; set 'url:' (xpi) or 'source:' (AMO slug)");
@@ -102,22 +102,6 @@ public sealed class BrowserExtensionManager : IPackageManager
     }
 
     private BrowserSpec Spec() => BrowserCatalog.For(_kind, FlatpakArch(), Home());
-
-    private readonly record struct Resolved(string Mode, string? Url, bool Valid);
-
-    private static Resolved Resolve(BrowserSpec spec, PackageSpec pkg)
-    {
-        var mode = BrowserPolicy.ResolveInstallationMode(pkg.Mode);
-        string? url = null;
-        if (BrowserPolicy.ModeNeedsUrl(mode))
-        {
-            url = spec.Family == BrowserPolicyFamily.Firefox
-                ? BrowserPolicy.FirefoxInstallUrl(pkg)
-                : BrowserPolicy.ChromiumUpdateUrl(pkg);
-        }
-        var valid = !BrowserPolicy.ModeNeedsUrl(mode) || url is not null;
-        return new Resolved(mode, url, valid);
-    }
 
     private List<PolicyTarget> ResolveTargets(BrowserSpec spec)
     {
@@ -172,11 +156,11 @@ public sealed class BrowserExtensionManager : IPackageManager
         }
     }
 
-    private (string Dest, string Content) Render(BrowserSpec spec, PolicyTarget target, ResolvedPackage pkg, Resolved resolved)
+    private (string Dest, string Content) Render(BrowserSpec spec, PolicyTarget target, ResolvedPackage pkg, BrowserPolicy.ResolvedExtension resolved)
     {
         if (spec.Family == BrowserPolicyFamily.Chromium)
         {
-            var dest = Path.Combine(target.Path, $"depend-{SanitizeId(pkg.Id)}.json");
+            var dest = Path.Combine(target.Path, BrowserPolicy.ChromiumFileName(pkg.Id));
             return (dest, BrowserPolicy.BuildChromiumExtensionFile(pkg.Id, resolved.Mode, resolved.Url));
         }
 
@@ -184,11 +168,11 @@ public sealed class BrowserExtensionManager : IPackageManager
         return (target.Path, BrowserPolicy.MergeFirefoxPolicies(existing, pkg.Id, resolved.Mode, resolved.Url));
     }
 
-    private static bool TargetHasExtension(BrowserSpec spec, PolicyTarget target, ResolvedPackage pkg, Resolved resolved)
+    private static bool TargetHasExtension(BrowserSpec spec, PolicyTarget target, ResolvedPackage pkg, BrowserPolicy.ResolvedExtension resolved)
     {
         if (spec.Family == BrowserPolicyFamily.Chromium)
         {
-            var file = Path.Combine(target.Path, $"depend-{SanitizeId(pkg.Id)}.json");
+            var file = Path.Combine(target.Path, BrowserPolicy.ChromiumFileName(pkg.Id));
             return BrowserPolicy.ChromiumFileHasExtension(TryReadFile(file), pkg.Id, resolved.Mode, resolved.Url);
         }
         return BrowserPolicy.FirefoxPoliciesHasExtension(TryReadFile(target.Path), pkg.Id, resolved.Mode, resolved.Url);
@@ -258,9 +242,6 @@ public sealed class BrowserExtensionManager : IPackageManager
 
     private static bool IsGenericBinDir(string dir) =>
         GenericBinDirs.Contains(dir.TrimEnd('/'), StringComparer.Ordinal);
-
-    private static string SanitizeId(string id) =>
-        new(id.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '-').ToArray());
 
     private static string FlatpakArch() => RuntimeInformation.ProcessArchitecture switch
     {

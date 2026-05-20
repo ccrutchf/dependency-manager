@@ -128,6 +128,106 @@ public class BrowserPolicyTests
         BrowserPolicy.ChromiumFileHasExtension(json, "id", "normal_installed", null).ShouldBeFalse();
         BrowserPolicy.FirefoxPoliciesHasExtension(json, "id", "normal_installed", null).ShouldBeFalse();
     }
+
+    [Fact]
+    public void Firefox_normal_mode_builds_url_from_source_slug()
+    {
+        var r = BrowserPolicy.ResolveExtension(
+            BrowserPolicyFamily.Firefox, new PackageSpec { Source = "ublock-origin" });
+
+        r.Valid.ShouldBeTrue();
+        r.Mode.ShouldBe("normal_installed");
+        r.Url.ShouldBe("https://addons.mozilla.org/firefox/downloads/latest/ublock-origin/latest.xpi");
+    }
+
+    [Fact]
+    public void Firefox_auto_install_without_a_url_is_invalid()
+    {
+        var r = BrowserPolicy.ResolveExtension(BrowserPolicyFamily.Firefox, new PackageSpec());
+
+        r.Valid.ShouldBeFalse();
+        r.Mode.ShouldBe("normal_installed");
+        r.Url.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Firefox_allowed_mode_is_valid_without_a_url()
+    {
+        var r = BrowserPolicy.ResolveExtension(
+            BrowserPolicyFamily.Firefox, new PackageSpec { Mode = "allowed" });
+
+        r.Valid.ShouldBeTrue();
+        r.Mode.ShouldBe("allowed");
+        r.Url.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Chromium_auto_install_defaults_to_store_url_so_it_is_always_valid()
+    {
+        var r = BrowserPolicy.ResolveExtension(BrowserPolicyFamily.Chromium, new PackageSpec());
+
+        r.Valid.ShouldBeTrue();
+        r.Mode.ShouldBe("normal_installed");
+        r.Url.ShouldBe(BrowserPolicy.ChromeWebStoreUpdateUrl);
+    }
+
+    [Fact]
+    public void Chromium_force_mode_honors_explicit_url()
+    {
+        var r = BrowserPolicy.ResolveExtension(
+            BrowserPolicyFamily.Chromium, new PackageSpec { Mode = "force", Url = "https://example/u" });
+
+        r.Valid.ShouldBeTrue();
+        r.Mode.ShouldBe("force_installed");
+        r.Url.ShouldBe("https://example/u");
+    }
+
+    [Fact]
+    public void Chromium_blocked_mode_carries_no_url()
+    {
+        var r = BrowserPolicy.ResolveExtension(
+            BrowserPolicyFamily.Chromium, new PackageSpec { Mode = "blocked" });
+
+        r.Valid.ShouldBeTrue();
+        r.Mode.ShouldBe("blocked");
+        r.Url.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Chromium_file_name_is_per_extension()
+    {
+        BrowserPolicy.ChromiumFileName("cjpalhdlnbpafiamejdnhcphjbkeiagm")
+            .ShouldBe("depend-cjpalhdlnbpafiamejdnhcphjbkeiagm.json");
+    }
+
+    [Fact]
+    public void Chromium_file_name_sanitizes_unsafe_characters()
+    {
+        // Defensive: an id is part of a filesystem path, so path/separator chars must not leak through.
+        BrowserPolicy.ChromiumFileName("a/b c@d").ShouldBe("depend-a-b-c-d.json");
+    }
+
+    [Fact]
+    public void Firefox_blocked_extension_is_written_without_an_install_url()
+    {
+        var json = BrowserPolicy.MergeFirefoxPolicies(existing: null, "ext@x", "blocked", installUrl: null);
+
+        json.ShouldNotContain("install_url");
+        BrowserPolicy.FirefoxPoliciesHasExtension(json, "ext@x", "blocked", null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Firefox_re_merge_updates_the_same_extension_in_place()
+    {
+        var first = BrowserPolicy.MergeFirefoxPolicies(null, "ext@x", "normal_installed", "https://example/x.xpi");
+        var second = BrowserPolicy.MergeFirefoxPolicies(first, "ext@x", "force_installed", "https://example/x.xpi");
+
+        BrowserPolicy.FirefoxPoliciesHasExtension(second, "ext@x", "force_installed", "https://example/x.xpi")
+            .ShouldBeTrue();
+        // The old mode is gone, not duplicated.
+        BrowserPolicy.FirefoxPoliciesHasExtension(second, "ext@x", "normal_installed", "https://example/x.xpi")
+            .ShouldBeFalse();
+    }
 }
 
 public class BrowserCatalogTests
@@ -177,4 +277,45 @@ public class BrowserCatalogTests
             "/home/u/.local/share/flatpak/extension/org.chromium.Chromium.Extension.system-policies/aarch64/stable/policies/managed");
         target.RequiresRoot.ShouldBeFalse();
     }
+
+    [Fact]
+    public void Zen_is_a_firefox_family_flatpak_browser()
+    {
+        var spec = BrowserCatalog.For(ManagerKind.Zen, "x86_64", "/home/u");
+
+        spec.Family.ShouldBe(BrowserPolicyFamily.Firefox);
+        spec.FlatpakAppId.ShouldBe("app.zen_browser.zen");
+        spec.FlatpakExtensionPoint.ShouldBe("app.zen_browser.zen.systemconfig");
+        spec.SnapName.ShouldBeNull();
+
+        // Zen ships no /etc target; its policies live next to the binary.
+        spec.NativeTargets.ShouldAllBe(t => t.Path.EndsWith("distribution/policies.json"));
+    }
+
+    [Fact]
+    public void Chromium_native_and_snap_targets_are_known()
+    {
+        var spec = BrowserCatalog.For(ManagerKind.Chromium, "x86_64", "/home/u");
+
+        spec.Family.ShouldBe(BrowserPolicyFamily.Chromium);
+        spec.NativeTargets.ShouldContain(t => t.Path == "/etc/chromium/policies/managed");
+        spec.SnapName.ShouldBe("chromium");
+        spec.SnapTargets.ShouldContain(t => t.Path == "/var/snap/chromium/current/policies/managed");
+    }
+
+    [Fact]
+    public void Brave_is_a_chromium_family_browser_with_etc_brave_target()
+    {
+        var spec = BrowserCatalog.For(ManagerKind.Brave, "x86_64", "/home/u");
+
+        spec.Family.ShouldBe(BrowserPolicyFamily.Chromium);
+        spec.NativeTargets.ShouldContain(t => t.Path == "/etc/brave/policies/managed");
+    }
+
+    [Theory]
+    [InlineData(ManagerKind.Apt)]
+    [InlineData(ManagerKind.Snap)]
+    [InlineData(ManagerKind.VsCode)]
+    public void For_throws_on_non_browser_kinds(ManagerKind kind) =>
+        Should.Throw<ArgumentOutOfRangeException>(() => BrowserCatalog.For(kind, "x86_64", "/home/u"));
 }

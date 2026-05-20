@@ -71,6 +71,30 @@ public static class BrowserPolicy
     public static string ChromiumUpdateUrl(PackageSpec spec) =>
         !string.IsNullOrWhiteSpace(spec.Url) ? spec.Url : ChromeWebStoreUpdateUrl;
 
+    public readonly record struct ResolvedExtension(string Mode, string? Url, bool Valid);
+
+    /// <summary>
+    /// Resolves the installation_mode, download url, and validity for an extension.
+    /// Auto-install modes (force/normal) require a url; <see cref="ResolvedExtension.Valid"/>
+    /// is false when one can't be determined. Family selects Firefox install_url vs
+    /// Chromium update_url (the latter defaults to the Chrome Web Store, so it is always valid).
+    /// </summary>
+    public static ResolvedExtension ResolveExtension(BrowserPolicyFamily family, PackageSpec spec)
+    {
+        var mode = ResolveInstallationMode(spec.Mode);
+        string? url = null;
+        if (ModeNeedsUrl(mode))
+            url = family == BrowserPolicyFamily.Firefox ? FirefoxInstallUrl(spec) : ChromiumUpdateUrl(spec);
+        var valid = !ModeNeedsUrl(mode) || url is not null;
+        return new ResolvedExtension(mode, url, valid);
+    }
+
+    /// <summary>The per-extension filename written into a Chromium <c>policies/managed/</c> directory.</summary>
+    public static string ChromiumFileName(string id) => $"depend-{SanitizeId(id)}.json";
+
+    private static string SanitizeId(string id) =>
+        new(id.Select(c => char.IsLetterOrDigit(c) || c is '-' or '_' or '.' ? c : '-').ToArray());
+
     /// <summary>Builds the contents of a single Chromium <c>managed/depend-&lt;id&gt;.json</c> file.</summary>
     public static string BuildChromiumExtensionFile(string id, string installationMode, string? updateUrl)
     {

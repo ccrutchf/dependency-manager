@@ -15,6 +15,8 @@ Targets .NET 10 (`net10.0`). Solution file: `DependencyManager.sln`. Assembly na
 
 `TreatWarningsAsErrors=true` — warnings will break the build.
 
+**Work test-first (TDD).** Add or update a test that captures the new behavior, run it and watch it fail, then write the minimum code to make it pass. This applies to everything — config keys, planner/runner logic, root rules, and the pure logic behind managers. See *Tests* below.
+
 ## Architecture
 
 The pipeline has three stages: **load → plan → run**. Each stage has a single entry point and is unit-testable without the others.
@@ -37,4 +39,6 @@ The pipeline has three stages: **load → plan → run**. Each stage has a singl
 
 ## Tests
 
-xUnit + Shouldly. Tests construct `ConfigFile`/`Block` records directly rather than parsing YAML, except `ConfigLoaderTests` which exercises the YAML pipeline end-to-end. There are no integration tests that hit real package managers — the `IPackageManager` implementations are tested manually.
+**Development here is test-driven (see Commands): the test comes first.** Because a behavior change starts from a failing test, structure code so the behavior is reachable from a test without a real package manager or filesystem. The pattern: keep the testable core in pure helpers and leave only a thin shell-out/filesystem layer untested — e.g. `BrowserPolicy` (JSON/mode/url) and `BrowserCatalog` (path-building) are fully unit-tested, so `BrowserExtensionManager`'s untestable surface (detection, `sudo install`, file writes) stays small. Do the same for new providers.
+
+xUnit + Shouldly. Tests construct `ConfigFile`/`Block` records directly rather than parsing YAML, except `ConfigLoaderTests` which exercises the YAML pipeline end-to-end. There are no integration tests that hit real package managers — the thin `IPackageManager` filesystem/process layer is verified manually.
