@@ -577,3 +577,6 @@ FodyWeavers.xsd
 ### Nix ###
 result
 result-*
+
+### direnv ###
+.direnv/

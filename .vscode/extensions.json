@@ -1,0 +1,23 @@
+{
+  // Extensions recommended for this repo. VS Code prompts to install these
+  // when the workspace is opened. See https://go.microsoft.com/fwlink/?LinkId=827846
+  "recommendations": [
+    // C# / .NET 10 — the core of this project (assembly "depend", net10.0)
+    "ms-dotnettools.csdevkit",
+    "ms-dotnettools.csharp",
+    "ms-dotnettools.vscode-dotnet-runtime",
+
+    // YAML — package config files (examples/packages.yaml, packages.yaml)
+    "redhat.vscode-yaml",
+
+    // Nix — flake.nix dev shell / packaging
+    "jnoortheen.nix-ide",
+
+    // direnv — auto-load the flake dev shell on entering the workspace
+    "mkhl.direnv",
+
+    // xUnit + general test explorer integration
+    "formulahendry.dotnet-test-explorer"
+  ],
+  "unwantedRecommendations": []
+}
