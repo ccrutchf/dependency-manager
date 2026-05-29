@@ -49,10 +49,17 @@ public static class UpdateCommand
             Console.WriteLine("  [update]  nixos");
             try
             {
-                var result = await Sudo.RunAsync("nixos-rebuild", ["switch", "--upgrade"], ct);
-                if (result.ExitCode != 0)
-                    throw new InvalidOperationException(
-                        $"nixos-rebuild switch --upgrade failed: {(result.StdErr.Length > 0 ? result.StdErr.Trim() : result.StdOut.Trim())}");
+                var flakeRef = Environment.GetEnvironmentVariable("DEPEND_NIXOS_FLAKE");
+                foreach (var step in NixosUpdate.Plan(flakeRef))
+                {
+                    var label = $"{step.Command} {string.Join(' ', step.Args)}";
+                    var result = step.Sudo
+                        ? await Sudo.RunAsync(step.Command, step.Args, ct)
+                        : await ProcessRunner.RunAsync(step.Command, step.Args, ct);
+                    if (result.ExitCode != 0)
+                        throw new InvalidOperationException(
+                            $"{label} failed: {(result.StdErr.Length > 0 ? result.StdErr.Trim() : result.StdOut.Trim())}");
+                }
                 succeeded++;
             }
             catch (Exception ex)
