@@ -4,6 +4,7 @@ using Xunit;
 
 namespace DependencyManager.Tests;
 
+[Collection("PathLookup")]
 public class PathLookupTests : IDisposable
 {
     private readonly string? _originalPath = Environment.GetEnvironmentVariable("PATH");

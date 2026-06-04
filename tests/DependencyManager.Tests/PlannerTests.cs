@@ -6,6 +6,7 @@ using Xunit;
 
 namespace DependencyManager.Tests;
 
+[Collection("PathLookup")]
 public class PlannerTests
 {
     private static PlatformInfo Linux => new("linux", "amd64", "5.15");
