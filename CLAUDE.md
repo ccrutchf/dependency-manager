@@ -11,7 +11,7 @@ Targets .NET 10 (`net10.0`). Solution file: `DependencyManager.sln`. Assembly na
 - Run all tests: `dotnet test`
 - Run one test class: `dotnet test --filter "FullyQualifiedName~PlannerTests"`
 - Run one test: `dotnet test --filter "FullyQualifiedName~PlannerTests.Topo_sort_places_dependencies_first"`
-- Publish a release binary (mirrors `.github/workflows/release.yml`): `dotnet publish src/DependencyManager -c Release -r linux-x64 -o out/linux-x64` (supported RIDs: `linux-x64`, `linux-arm64`)
+- Publish a release binary (mirrors `.github/workflows/release.yml`): `dotnet publish src/DependencyManager -c Release -r linux-x64 -o out/linux-x64` (supported RIDs: `linux-x64`, `linux-arm64`, `osx-x64`, `osx-arm64`)
 
 `TreatWarningsAsErrors=true` — warnings will break the build.
 

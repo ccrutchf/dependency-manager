@@ -8,6 +8,27 @@ namespace DependencyManager.Tests;
 public class RootCheckTests
 {
     [Fact]
+    public void IsRoot_is_false_for_normal_user_on_posix()
+    {
+        if (OperatingSystem.IsWindows()) return;
+        if (Environment.GetEnvironmentVariable("USER") == "root") return;
+
+        RootCheck.IsRoot().ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Vscode_extension_plan_does_not_require_sudo()
+    {
+        var plan = new ResolvedPlan(
+            new[] { new ResolvedPackage(ManagerKind.VsCode, "ms-python.python", new PackageSpec(), "b") },
+            Array.Empty<string>(),
+            Array.Empty<ResolvedAptSource>(),
+            Array.Empty<ResolvedRequirement>());
+
+        RootCheck.PlanRequiresSudo(plan).ShouldBeFalse();
+    }
+
+    [Fact]
     public void Pip_package_does_not_require_root_by_default()
     {
         var plan = new ResolvedPlan(

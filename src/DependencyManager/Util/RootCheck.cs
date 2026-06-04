@@ -10,7 +10,7 @@ public static class RootCheck
 
     public static bool IsRoot()
     {
-        if (!OperatingSystem.IsLinux()) return true;
+        if (OperatingSystem.IsWindows()) return false;
         return GetEffectiveUid() == 0;
     }
 

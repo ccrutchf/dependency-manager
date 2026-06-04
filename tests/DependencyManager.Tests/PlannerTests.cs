@@ -547,4 +547,95 @@ public class PlannerTests
         plan.ShouldContain(p => p.Manager == ManagerKind.Firefox);
         plan.ShouldContain(p => p.Manager == ManagerKind.Zen);
     }
+
+    [Fact]
+    public void Detects_self_cycle()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec>
+                {
+                    ["loop"] = new() { Dependencies = new List<string> { "loop" } },
+                },
+            },
+        });
+
+        Should.Throw<InvalidOperationException>(() => Planner.Plan(config, Linux));
+    }
+
+    [Fact]
+    public void Diamond_dependencies_appear_once_and_are_topo_sorted()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Apt = new Dictionary<string, PackageSpec>
+                {
+                    ["a"] = new() { Dependencies = new List<string> { "b", "c" } },
+                    ["b"] = new() { Dependencies = new List<string> { "d" } },
+                    ["c"] = new() { Dependencies = new List<string> { "d" } },
+                    ["d"] = new(),
+                },
+            },
+        });
+
+        var ids = Planner.Plan(config, Linux).Packages.Select(p => p.Id).ToList();
+
+        ids.Count.ShouldBe(4);
+        ids.IndexOf("d").ShouldBeLessThan(ids.IndexOf("b"));
+        ids.IndexOf("d").ShouldBeLessThan(ids.IndexOf("c"));
+        ids.IndexOf("b").ShouldBeLessThan(ids.IndexOf("a"));
+        ids.IndexOf("c").ShouldBeLessThan(ids.IndexOf("a"));
+    }
+
+    [Fact]
+    public void Whitespace_only_requires_entry_is_ignored()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["linux"] = new()
+            {
+                Platform = "linux",
+                Requires = new List<string> { "   ", string.Empty },
+            },
+        });
+
+        Planner.Plan(config, Linux).Requirements.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Apt_source_last_block_wins_on_duplicate_name_keeping_first_seen_order()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["first"] = new()
+            {
+                Platform = "linux",
+                AptSources = new Dictionary<string, AptSource>
+                {
+                    ["docker"] = new() { Uri = "https://first" },
+                },
+            },
+            ["second"] = new()
+            {
+                Platform = "linux",
+                AptSources = new Dictionary<string, AptSource>
+                {
+                    ["docker"] = new() { Uri = "https://second" },
+                },
+            },
+        });
+
+        var sources = Planner.Plan(config, Linux).AptSources;
+
+        sources.Count.ShouldBe(1);
+        sources[0].Name.ShouldBe("docker");
+        sources[0].Source.Uri.ShouldBe("https://second");
+        sources[0].BlockName.ShouldBe("second");
+    }
 }

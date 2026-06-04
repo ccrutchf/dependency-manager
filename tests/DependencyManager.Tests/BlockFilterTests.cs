@@ -48,4 +48,37 @@ public class BlockFilterTests
         var block = new Block { Platform = "LINUX" };
         BlockFilter.Matches(block, Linux64).ShouldBeTrue();
     }
+
+    [Fact]
+    public void Architecture_comparison_is_case_insensitive()
+    {
+        var block = new Block { Platform = "linux", Architecture = "AMD64" };
+        BlockFilter.Matches(block, Linux64).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Version_prefix_match_is_case_insensitive()
+    {
+        var block = new Block { Platform = "windows", Version = "10.0.22631" };
+        BlockFilter.Matches(block, WindowsArm).ShouldBeTrue();
+
+        var upper = new Block { Platform = "windows", Version = "10.0" };
+        BlockFilter.Matches(upper, WindowsArm).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void All_wildcard_on_block_side_matches_specific_platform()
+    {
+        var block = new Block { Platform = "all", Architecture = "amd64" };
+        BlockFilter.Matches(block, Linux64).ShouldBeTrue();
+        BlockFilter.Matches(block, WindowsArm).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void All_wildcard_is_case_insensitive()
+    {
+        var block = new Block { Platform = "ALL", Architecture = "All" };
+        BlockFilter.Matches(block, Linux64).ShouldBeTrue();
+        BlockFilter.Matches(block, WindowsArm).ShouldBeTrue();
+    }
 }

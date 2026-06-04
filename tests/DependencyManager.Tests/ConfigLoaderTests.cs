@@ -301,4 +301,29 @@ public class ConfigLoaderTests
         block.Firefox.ShouldNotBeNull();
         block.Firefox["uBlock0@raymondhill.net"].Url.ShouldBe("https://example/ublock.xpi");
     }
+
+    [Fact]
+    public void Unknown_block_keys_emit_warning_to_stderr()
+    {
+        var yaml = """
+        sample:
+          platform: linux
+          totally_made_up_provider:
+            something:
+        """;
+
+        var prev = Console.Error;
+        var capture = new StringWriter();
+        Console.SetError(capture);
+        try
+        {
+            ConfigLoader.Parse(yaml);
+        }
+        finally
+        {
+            Console.SetError(prev);
+        }
+
+        capture.ToString().ShouldContain("warning: unknown key 'totally_made_up_provider'");
+    }
 }
