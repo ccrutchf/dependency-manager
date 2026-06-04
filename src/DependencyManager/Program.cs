@@ -12,6 +12,11 @@ var failFastOption = new Option<bool>("--fail-fast")
     Description = "Abort on the first failure (default: continue and summarize at end)",
 };
 
+var restartOption = new Option<bool>("--restart")
+{
+    Description = "Allow system updaters to reboot the machine when an update requires it",
+};
+
 var planCmd = new Command("plan", "Print the resolved package plan without installing anything");
 planCmd.Options.Add(configOption);
 planCmd.SetAction(parseResult => PlanCommand.Run(parseResult.GetValue(configOption)!));
@@ -32,7 +37,10 @@ var listCmd = new Command("list", "Show which package managers are available on 
 listCmd.SetAction(_ => ListCommand.Run());
 
 var updateCmd = new Command("update", "Update all packages via every available provider");
-updateCmd.SetAction((_, ct) => UpdateCommand.RunAsync(ct));
+updateCmd.Options.Add(restartOption);
+updateCmd.SetAction((parseResult, ct) => UpdateCommand.RunAsync(
+    parseResult.GetValue(restartOption),
+    ct));
 
 var root = new RootCommand("depend — declarative package installer");
 root.Subcommands.Add(planCmd);

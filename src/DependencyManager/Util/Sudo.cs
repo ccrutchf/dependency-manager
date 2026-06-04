@@ -17,6 +17,19 @@ public static class Sudo
         return ProcessRunner.RunAsync("sudo", wrapped, ct);
     }
 
+    public static Task<int> RunStreamingAsync(
+        string fileName,
+        IEnumerable<string> arguments,
+        CancellationToken ct = default)
+    {
+        if (RootCheck.IsRoot())
+            return ProcessRunner.RunStreamingAsync(fileName, arguments, ct);
+
+        var wrapped = new List<string> { fileName };
+        wrapped.AddRange(arguments);
+        return ProcessRunner.RunStreamingAsync("sudo", wrapped, ct);
+    }
+
     public static async Task<bool> PrimeAsync(CancellationToken ct = default)
     {
         var psi = new ProcessStartInfo
