@@ -17,6 +17,9 @@ public enum ManagerKind
     Chrome,
     Chromium,
     Brave,
+    Brew,
+    Cask,
+    Mas,
 }
 
 public sealed record ConfigFile(Dictionary<string, Block> Blocks);
@@ -51,6 +54,12 @@ public sealed record Block
     public Dictionary<string, PackageSpec>? Chrome { get; init; }
     public Dictionary<string, PackageSpec>? Chromium { get; init; }
     public Dictionary<string, PackageSpec>? Brave { get; init; }
+
+    // macOS (and Linuxbrew) providers. brew = formulae, cask = GUI apps, mas =
+    // Mac App Store apps keyed by their numeric App Store id.
+    public Dictionary<string, PackageSpec>? Brew { get; init; }
+    public Dictionary<string, PackageSpec>? Cask { get; init; }
+    public Dictionary<string, PackageSpec>? Mas { get; init; }
 }
 
 public sealed record PackageSpec

@@ -35,6 +35,20 @@ public class ManagerAvailabilityTests
         new DebManager().IsAvailable().ShouldBeFalse();
     }
 
+    [Fact]
+    public void CaskManager_is_unavailable_on_non_macos()
+    {
+        if (OperatingSystem.IsMacOS()) return;
+        new BrewManager(cask: true).IsAvailable().ShouldBeFalse();
+    }
+
+    [Fact]
+    public void MasManager_is_unavailable_on_non_macos()
+    {
+        if (OperatingSystem.IsMacOS()) return;
+        new MasManager().IsAvailable().ShouldBeFalse();
+    }
+
     [Theory]
     [InlineData(ManagerKind.Firefox)]
     [InlineData(ManagerKind.Zen)]

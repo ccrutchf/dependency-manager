@@ -639,4 +639,49 @@ public class PlannerTests
         sources[0].Source.Uri.ShouldBe("https://second");
         sources[0].BlockName.ShouldBe("second");
     }
+
+    [Fact]
+    public void Brew_cask_and_mas_sections_flow_through_as_distinct_kinds()
+    {
+        var mac = new PlatformInfo("osx", "arm64", "26.4");
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["mac"] = new()
+            {
+                Platform = "osx",
+                Brew = new Dictionary<string, PackageSpec> { ["swiftlint"] = new() },
+                Cask = new Dictionary<string, PackageSpec> { ["visual-studio-code"] = new() },
+                Mas = new Dictionary<string, PackageSpec> { ["497799835"] = new() },
+            },
+        });
+
+        var plan = Planner.Plan(config, mac).Packages;
+
+        plan.Count.ShouldBe(3);
+        plan.ShouldContain(p => p.Manager == ManagerKind.Brew && p.Id == "swiftlint");
+        plan.ShouldContain(p => p.Manager == ManagerKind.Cask && p.Id == "visual-studio-code");
+        plan.ShouldContain(p => p.Manager == ManagerKind.Mas && p.Id == "497799835");
+    }
+
+    [Fact]
+    public void Same_id_as_brew_and_cask_does_not_collide()
+    {
+        var mac = new PlatformInfo("osx", "arm64", "26.4");
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["mac"] = new()
+            {
+                Platform = "osx",
+                Brew = new Dictionary<string, PackageSpec> { ["docker"] = new() },
+                Cask = new Dictionary<string, PackageSpec> { ["docker"] = new() },
+            },
+        });
+
+        var plan = Planner.Plan(config, mac).Packages;
+
+        // Distinct ManagerKinds keep the (kind, id) keys separate.
+        plan.Count.ShouldBe(2);
+        plan.ShouldContain(p => p.Manager == ManagerKind.Brew);
+        plan.ShouldContain(p => p.Manager == ManagerKind.Cask);
+    }
 }

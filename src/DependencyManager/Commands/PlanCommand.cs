@@ -6,8 +6,27 @@ namespace DependencyManager.Commands;
 
 public static class PlanCommand
 {
-    public static int Run(string configPath)
+    public static int Run(string configPath) => PrintPlan(configPath, out _);
+
+    /// <summary>
+    /// Prints the resolved plan and, when <paramref name="prune"/> is set, also
+    /// previews the removals that `install --prune` would make — a dry-run prune,
+    /// so `plan --prune` is a complete preview of `install --prune`.
+    /// </summary>
+    public static async Task<int> RunAsync(string configPath, bool prune, CancellationToken ct)
     {
+        var rc = PrintPlan(configPath, out var plan);
+        if (rc != 0 || !prune || plan is null) return rc;
+
+        Console.WriteLine();
+        Console.WriteLine("prune preview (installed but not declared; install --prune would remove these):");
+        var runner = new Runner.Runner(InstallCommand.BuildManagers(plan));
+        return await runner.PruneAsync(plan.Packages, apply: false, ct);
+    }
+
+    private static int PrintPlan(string configPath, out ResolvedPlan? resolved)
+    {
+        resolved = null;
         if (!File.Exists(configPath))
         {
             Console.Error.WriteLine($"config file not found: {configPath}");
@@ -52,6 +71,7 @@ public static class PlanCommand
         if (RootCheck.PlanRequiresSudo(plan))
             Console.WriteLine("note: this plan will invoke sudo to install (apt/snap/PPAs, browser extension policies, or system-scope packages present)");
 
+        resolved = plan;
         return 0;
     }
 }

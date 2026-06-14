@@ -3,7 +3,7 @@ using DependencyManager.Util;
 
 namespace DependencyManager.Managers;
 
-public sealed class VsCodeManager : IPackageManager
+public sealed class VsCodeManager : IPrunableManager
 {
     private const string DefaultBinary = "code";
 
@@ -57,5 +57,30 @@ public sealed class VsCodeManager : IPackageManager
         if (failures.Count > 0)
             throw new InvalidOperationException(
                 $"{DefaultBinary} --install-extension failed for {failures.Count} extension(s): {string.Join("; ", failures)}");
+    }
+
+    // --- prune ---------------------------------------------------------------
+
+    public PrunePolicy MaxPolicy => PrunePolicy.Zap;
+
+    public async Task<IReadOnlyList<string>> ListExplicitAsync(CancellationToken ct)
+    {
+        var ids = new List<string>();
+        var result = await ProcessRunner.RunAsync(DefaultBinary, ["--list-extensions"], ct);
+        if (result.ExitCode != 0) return ids;
+        foreach (var line in result.StdOut.Split('\n'))
+        {
+            var id = line.Trim();
+            if (id.Length > 0) ids.Add(id);
+        }
+        return ids;
+    }
+
+    public async Task UninstallAsync(string id, CancellationToken ct)
+    {
+        var result = await ProcessRunner.RunAsync(DefaultBinary, ["--uninstall-extension", id], ct);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException(
+                $"{DefaultBinary} --uninstall-extension {id} failed: {result.StdErr.Trim()}");
     }
 }

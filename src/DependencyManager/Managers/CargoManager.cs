@@ -3,7 +3,7 @@ using DependencyManager.Util;
 
 namespace DependencyManager.Managers;
 
-public sealed class CargoManager : IPackageManager
+public sealed class CargoManager : IPrunableManager
 {
     public ManagerKind Kind => ManagerKind.Cargo;
 
@@ -47,6 +47,25 @@ public sealed class CargoManager : IPackageManager
         if (failures.Count > 0)
             throw new InvalidOperationException(
                 $"cargo install failed for {failures.Count} crate(s): {string.Join("; ", failures)}");
+    }
+
+    // --- prune ---------------------------------------------------------------
+
+    public PrunePolicy MaxPolicy => PrunePolicy.Zap;
+
+    public async Task<IReadOnlyList<string>> ListExplicitAsync(CancellationToken ct)
+    {
+        // `cargo install --list` reports only top-level installed crates — there
+        // is no transitive-crate pollution to filter out.
+        var installed = await ListInstalledAsync(ct);
+        return installed.ToList();
+    }
+
+    public async Task UninstallAsync(string id, CancellationToken ct)
+    {
+        var result = await ProcessRunner.RunAsync("cargo", ["uninstall", id], ct);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"cargo uninstall {id} failed: {result.StdErr.Trim()}");
     }
 
     private static async Task<HashSet<string>> ListInstalledAsync(CancellationToken ct)
