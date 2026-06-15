@@ -43,11 +43,20 @@ public sealed class MasManager : IPrunableManager
 
     public async Task<IReadOnlyList<string>> ListExplicitAsync(CancellationToken ct)
     {
-        // `mas list` lines look like: "497799835  Xcode (15.4)" — id is token 0.
-        var ids = new List<string>();
         var result = await ProcessRunner.RunAsync("mas", ["list"], ct);
-        if (result.ExitCode != 0) return ids;
-        foreach (var line in result.StdOut.Split('\n'))
+        return result.ExitCode != 0 ? [] : ParseInstalledIds(result.StdOut);
+    }
+
+    /// <summary>
+    /// Pure parser for <c>mas list</c> output: lines look like
+    /// <c>"497799835  Xcode (15.4)"</c> — the id is the first whitespace-delimited
+    /// token. Extracted so it is unit-testable without the App Store.
+    /// </summary>
+    public static IReadOnlyList<string> ParseInstalledIds(string masListOutput)
+    {
+        var ids = new List<string>();
+        if (string.IsNullOrEmpty(masListOutput)) return ids;
+        foreach (var line in masListOutput.Split('\n'))
         {
             var id = line.Trim().Split(' ', 2)[0];
             if (id.Length > 0) ids.Add(id);
