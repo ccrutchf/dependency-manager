@@ -1,0 +1,28 @@
+name: nix
+
+# Builds the depend flake (`.#default`) on Linux and macOS so the Nix packaging
+# stays valid alongside the plain dotnet ci.yml. buildDotnetModule runs the xUnit
+# suite in checkPhase, so a green build also means the tests passed under Nix.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: nix build (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: DeterminateSystems/nix-installer-action@main
+      # `.#default` resolves to packages.<host-system>.default — x86_64-linux on
+      # ubuntu, aarch64-darwin on the macOS runner. The macOS build requires
+      # nix/deps.json to carry the osx-arm64 runtime packs (regenerate with
+      # `nix build .#default.fetch-deps` and run the resulting script, then commit).
+      - run: nix build .#default --print-build-logs

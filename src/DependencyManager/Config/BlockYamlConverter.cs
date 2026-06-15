@@ -14,6 +14,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         {
             "apt", "snap", "flatpak", "deb", "pip", "pipx", "script", "vscode", "cargo", "nvm",
             "firefox", "zen", "chrome", "chromium", "brave",
+            "brew", "cask", "mas",
         };
 
     private const string PpasKey = "ppas";
@@ -47,6 +48,9 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         Dictionary<string, PackageSpec>? chrome = null;
         Dictionary<string, PackageSpec>? chromium = null;
         Dictionary<string, PackageSpec>? brave = null;
+        Dictionary<string, PackageSpec>? brew = null;
+        Dictionary<string, PackageSpec>? cask = null;
+        Dictionary<string, PackageSpec>? mas = null;
 
         while (!parser.TryConsume<MappingEnd>(out _))
         {
@@ -96,11 +100,14 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
                     case "chrome": chrome = section; break;
                     case "chromium": chromium = section; break;
                     case "brave": brave = section; break;
+                    case "brew": brew = section; break;
+                    case "cask": cask = section; break;
+                    case "mas": mas = section; break;
                 }
             }
             else
             {
-                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources/requires or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm/firefox/zen/chrome/chromium/brave)");
+                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources/requires or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm/firefox/zen/chrome/chromium/brave/brew/cask/mas)");
                 _ = rootDeserializer(typeof(object));
             }
         }
@@ -128,6 +135,9 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             Chrome = chrome,
             Chromium = chromium,
             Brave = brave,
+            Brew = brew,
+            Cask = cask,
+            Mas = mas,
         };
     }
 

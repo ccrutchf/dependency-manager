@@ -43,6 +43,21 @@ linux-desktop:
     ripgrep:
     cargo-update:
 
+mac-apps:
+  platform: osx
+  # Homebrew. `brew` = formulae, `cask` = GUI apps, `mas` = Mac App Store (keyed
+  # by the numeric app id). brew never runs under sudo. A formula/cask `source:`
+  # containing a slash is treated as a tap and tapped before install.
+  brew:
+    swiftlint:
+    cocoapods:
+  cask:
+    visual-studio-code:
+    zen-browser:
+  mas:
+    "497799835":   # Xcode
+      name: Xcode
+
 vscode-extensions:
   platform: all
   requires:

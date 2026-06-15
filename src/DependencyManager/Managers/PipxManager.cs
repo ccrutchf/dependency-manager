@@ -3,7 +3,7 @@ using DependencyManager.Util;
 
 namespace DependencyManager.Managers;
 
-public sealed class PipxManager : IPackageManager
+public sealed class PipxManager : IPrunableManager
 {
     private readonly bool _userScope;
 
@@ -54,5 +54,35 @@ public sealed class PipxManager : IPackageManager
             : await Sudo.RunAsync("pipx", args, ct);
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"pipx upgrade-all failed: {result.StdErr.Trim()}");
+    }
+
+    // --- prune ---------------------------------------------------------------
+
+    public PrunePolicy MaxPolicy => PrunePolicy.Zap;
+
+    public async Task<IReadOnlyList<string>> ListExplicitAsync(CancellationToken ct)
+    {
+        // pipx only ever installs top-level apps, so `list --short` IS the
+        // explicit set — first token of each line is the package name.
+        var names = new List<string>();
+        var result = await ProcessRunner.RunAsync("pipx", ["list", "--short"], ct);
+        if (result.ExitCode != 0) return names;
+        foreach (var line in result.StdOut.Split('\n'))
+        {
+            var name = line.Trim().Split(' ', 2)[0];
+            if (name.Length > 0) names.Add(name);
+        }
+        return names;
+    }
+
+    public async Task UninstallAsync(string id, CancellationToken ct)
+    {
+        var args = new List<string> { "uninstall", id };
+        if (!_userScope) args.Add("--global");
+        var result = _userScope
+            ? await ProcessRunner.RunAsync("pipx", args, ct)
+            : await Sudo.RunAsync("pipx", args, ct);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"pipx uninstall {id} failed: {result.StdErr.Trim()}");
     }
 }

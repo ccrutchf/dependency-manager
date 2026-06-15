@@ -177,6 +177,9 @@ public static class UpdateCommand
         new BrowserExtensionManager(ManagerKind.Chrome),
         new BrowserExtensionManager(ManagerKind.Chromium),
         new BrowserExtensionManager(ManagerKind.Brave),
+        new BrewManager(cask: false),
+        new BrewManager(cask: true),
+        new MasManager(),
     ];
 
     private static bool RequiresSudo(IPackageManager manager) =>

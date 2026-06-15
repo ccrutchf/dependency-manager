@@ -32,6 +32,9 @@ public static class Planner
             Flatten(block.Chrome, ManagerKind.Chrome, blockName, resolved);
             Flatten(block.Chromium, ManagerKind.Chromium, blockName, resolved);
             Flatten(block.Brave, ManagerKind.Brave, blockName, resolved);
+            Flatten(block.Brew, ManagerKind.Brew, blockName, resolved);
+            Flatten(block.Cask, ManagerKind.Cask, blockName, resolved);
+            Flatten(block.Mas, ManagerKind.Mas, blockName, resolved);
 
             if (block.Requires is not null)
             {

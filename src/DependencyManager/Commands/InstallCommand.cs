@@ -7,7 +7,10 @@ namespace DependencyManager.Commands;
 
 public static class InstallCommand
 {
-    public static async Task<int> RunAsync(string configPath, bool failFast, CancellationToken ct)
+    public static async Task<int> RunAsync(string configPath, bool failFast, CancellationToken ct) =>
+        await RunAsync(configPath, failFast, prune: false, ct);
+
+    public static async Task<int> RunAsync(string configPath, bool failFast, bool prune, CancellationToken ct)
     {
         if (!File.Exists(configPath))
         {
@@ -52,27 +55,36 @@ public static class InstallCommand
         var runner = new Runner.Runner(managers);
         var missing = await runner.FindMissingAsync(plan.Packages, ct);
 
+        var installExit = 0;
         if (missing.Count == 0)
         {
-            Console.WriteLine("all packages already installed; nothing to do.");
-            return 0;
+            Console.WriteLine("all packages already installed; nothing to install.");
         }
-
-        Console.WriteLine($"missing: {missing.Count} package(s)");
-
-        var effectivePlan = EffectivePlan(plan, missing);
-        if (RootCheck.PlanRequiresSudo(effectivePlan))
+        else
         {
-            Console.WriteLine("this plan includes privileged operations — priming sudo...");
-            if (!await Sudo.PrimeAsync(ct))
-            {
-                Console.Error.WriteLine("sudo authentication failed; aborting.");
-                return 1;
-            }
-        }
-        Console.WriteLine();
+            Console.WriteLine($"missing: {missing.Count} package(s)");
 
-        return await runner.InstallAsync(missing, failFast, ct);
+            var effectivePlan = EffectivePlan(plan, missing);
+            if (RootCheck.PlanRequiresSudo(effectivePlan))
+            {
+                Console.WriteLine("this plan includes privileged operations — priming sudo...");
+                if (!await Sudo.PrimeAsync(ct))
+                {
+                    Console.Error.WriteLine("sudo authentication failed; aborting.");
+                    return 1;
+                }
+            }
+            Console.WriteLine();
+
+            installExit = await runner.InstallAsync(missing, failFast, ct);
+        }
+
+        if (!prune) return installExit;
+
+        Console.WriteLine();
+        Console.WriteLine("prune: converging to the declared set...");
+        var pruneExit = await runner.PruneAsync(plan.Packages, apply: true, ct);
+        return installExit != 0 ? installExit : pruneExit;
     }
 
     private static ResolvedPlan EffectivePlan(ResolvedPlan plan, IReadOnlyList<ResolvedPackage> missing)
@@ -102,5 +114,8 @@ public static class InstallCommand
         new BrowserExtensionManager(ManagerKind.Chrome),
         new BrowserExtensionManager(ManagerKind.Chromium),
         new BrowserExtensionManager(ManagerKind.Brave),
+        new BrewManager(cask: false),
+        new BrewManager(cask: true),
+        new MasManager(),
     ];
 }

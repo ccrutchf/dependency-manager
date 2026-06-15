@@ -3,7 +3,7 @@ using DependencyManager.Util;
 
 namespace DependencyManager.Managers;
 
-public sealed class FlatpakManager : IPackageManager
+public sealed class FlatpakManager : IPrunableManager
 {
     private readonly bool _userScope;
     private readonly HashSet<bool> _remoteAdded = new();
@@ -54,6 +54,46 @@ public sealed class FlatpakManager : IPackageManager
             : await Sudo.RunAsync("flatpak", args, ct);
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"flatpak update {scopeFlag} failed: {result.StdErr.Trim()}");
+    }
+
+    // --- prune ---------------------------------------------------------------
+
+    public PrunePolicy MaxPolicy => PrunePolicy.Zap;
+
+    public async Task<IReadOnlyList<string>> ListExplicitAsync(CancellationToken ct)
+    {
+        // Apps only (--app), never runtimes — runtimes are dependencies. Scope to
+        // the manager's own scope so a user-scope run never lists system apps.
+        var scopeFlag = _userScope ? "--user" : "--system";
+        var ids = new List<string>();
+        var result = await ProcessRunner.RunAsync("flatpak", ["list", "--app", scopeFlag, "--columns=application"], ct);
+        if (result.ExitCode != 0) return ids;
+        foreach (var line in result.StdOut.Split('\n'))
+        {
+            var id = line.Trim();
+            if (id.Length > 0) ids.Add(id);
+        }
+        return ids;
+    }
+
+    public async Task UninstallAsync(string id, CancellationToken ct)
+    {
+        var scopeFlag = _userScope ? "--user" : "--system";
+        var args = new[] { "uninstall", scopeFlag, "-y", id };
+        var result = _userScope
+            ? await ProcessRunner.RunAsync("flatpak", args, ct)
+            : await Sudo.RunAsync("flatpak", args, ct);
+        if (result.ExitCode != 0)
+            throw new InvalidOperationException($"flatpak uninstall {id} failed: {result.StdErr.Trim()}");
+    }
+
+    public async Task CollectGarbageAsync(CancellationToken ct)
+    {
+        var scopeFlag = _userScope ? "--user" : "--system";
+        var args = new[] { "uninstall", scopeFlag, "--unused", "-y" };
+        _ = _userScope
+            ? await ProcessRunner.RunAsync("flatpak", args, ct)
+            : await Sudo.RunAsync("flatpak", args, ct);
     }
 
     private async Task EnsureFlathubAsync(bool userScope, CancellationToken ct)
