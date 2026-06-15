@@ -65,15 +65,30 @@ public sealed class VsCodeManager : IPrunableManager
 
     public async Task<IReadOnlyList<string>> ListExplicitAsync(CancellationToken ct)
     {
-        var ids = new List<string>();
         var result = await ProcessRunner.RunAsync(DefaultBinary, ["--list-extensions"], ct);
-        if (result.ExitCode != 0) return ids;
-        foreach (var line in result.StdOut.Split('\n'))
+        if (result.ExitCode != 0) return [];
+        var installed = VsCodeExtensions.ParseList(result.StdOut);
+
+        // Reduce to leaves: read each installed extension's manifest and subtract any
+        // id pulled in via extensionPack / extensionDependencies, so prune never
+        // removes a pack member of a declared extension (declaring ms-python.python
+        // protects pylance/debugpy/python-envs). Built-in defaults are already
+        // absent — `code --list-extensions` doesn't list them.
+        var extDir = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+            ".vscode", "extensions");
+        var pulledIn = new List<string>();
+        if (Directory.Exists(extDir))
         {
-            var id = line.Trim();
-            if (id.Length > 0) ids.Add(id);
+            foreach (var dir in Directory.EnumerateDirectories(extDir))
+            {
+                var manifest = Path.Combine(dir, "package.json");
+                if (!File.Exists(manifest)) continue;
+                try { pulledIn.AddRange(VsCodeExtensions.ParsePulledIn(File.ReadAllText(manifest))); }
+                catch (IOException) { /* unreadable manifest → treat as pulling nothing in */ }
+            }
         }
-        return ids;
+        return VsCodeExtensions.Leaves(installed, pulledIn);
     }
 
     public async Task UninstallAsync(string id, CancellationToken ct)
