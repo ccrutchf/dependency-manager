@@ -41,12 +41,11 @@ public sealed class BrewManager : IPrunableManager
     public async Task InstallAsync(ResolvedPackage pkg, CancellationToken ct)
     {
         // A tap given as `source:` must be tapped before an unqualified name resolves.
-        if (pkg.Spec.Source is { Length: > 0 } tap && tap.Contains('/'))
-            await ProcessRunner.RunAsync("brew", ["tap", tap], ct);
+        if (BrewPlan.IsTap(pkg.Spec.Source))
+            await ProcessRunner.RunAsync("brew", ["tap", pkg.Spec.Source!], ct);
 
         var name = pkg.Spec.Name ?? pkg.Id;
-        var args = _cask ? new[] { "install", "--cask", name } : new[] { "install", name };
-        var result = await ProcessRunner.RunAsync("brew", args, ct);
+        var result = await ProcessRunner.RunAsync("brew", BrewPlan.InstallArgs(_cask, name), ct);
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"brew install {name} failed: {result.StdErr.Trim()}");
     }
@@ -70,8 +69,7 @@ public sealed class BrewManager : IPrunableManager
 
     public async Task UninstallAsync(string id, CancellationToken ct)
     {
-        var args = _cask ? new[] { "uninstall", "--cask", id } : new[] { "uninstall", id };
-        var result = await ProcessRunner.RunAsync("brew", args, ct);
+        var result = await ProcessRunner.RunAsync("brew", BrewPlan.UninstallArgs(_cask, id), ct);
         if (result.ExitCode != 0)
             throw new InvalidOperationException($"brew uninstall {id} failed: {result.StdErr.Trim()}");
     }
@@ -90,20 +88,8 @@ public sealed class BrewManager : IPrunableManager
     /// </param>
     private async Task<HashSet<string>> ListAsync(bool explicitOnly, CancellationToken ct)
     {
-        var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        string[] args = (_cask, explicitOnly) switch
-        {
-            (true, _) => ["list", "--cask", "-1"],
-            (false, true) => ["leaves", "--installed-on-request"],
-            (false, false) => ["list", "--formula", "-1"],
-        };
-        var result = await ProcessRunner.RunAsync("brew", args, ct);
-        if (result.ExitCode != 0) return set;
-        foreach (var line in result.StdOut.Split('\n'))
-        {
-            var name = line.Trim();
-            if (name.Length > 0) set.Add(name);
-        }
-        return set;
+        var result = await ProcessRunner.RunAsync("brew", BrewPlan.ListArgs(_cask, explicitOnly), ct);
+        if (result.ExitCode != 0) return new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        return new HashSet<string>(BrewPlan.ParseNames(result.StdOut), StringComparer.OrdinalIgnoreCase);
     }
 }
