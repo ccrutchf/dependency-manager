@@ -19,8 +19,11 @@ public static class UpdateCommand
         var available = managers.Where(m => m.IsAvailable()).ToList();
         var nixosAvailable = OperatingSystem.IsLinux() && PathLookup.Exists("nixos-rebuild");
         var macosAvailable = OperatingSystem.IsMacOS() && PathLookup.Exists("softwareupdate");
+        // nix-darwin system update (the macOS analogue of nixos-rebuild). Separate
+        // from softwareupdate, which handles Apple's own OS/app updates.
+        var darwinNixAvailable = OperatingSystem.IsMacOS() && PathLookup.Exists("darwin-rebuild");
 
-        if (available.Count == 0 && !nixosAvailable && !macosAvailable)
+        if (available.Count == 0 && !nixosAvailable && !macosAvailable && !darwinNixAvailable)
         {
             Console.WriteLine("no package managers available on this machine");
             return 0;
@@ -28,11 +31,12 @@ public static class UpdateCommand
 
         var providerLabels = new List<string>();
         if (nixosAvailable) providerLabels.Add("nixos");
+        if (darwinNixAvailable) providerLabels.Add("darwin");
         if (macosAvailable) providerLabels.Add("macos");
         providerLabels.AddRange(available.Select(m => m.Kind.ToString().ToLowerInvariant()));
         Console.WriteLine($"available providers: {string.Join(", ", providerLabels)}");
 
-        if (nixosAvailable || macosAvailable || available.Any(RequiresSudo))
+        if (nixosAvailable || macosAvailable || darwinNixAvailable || available.Any(RequiresSudo))
         {
             Console.WriteLine("this update includes privileged operations — priming sudo...");
             if (!await Sudo.PrimeAsync(ct))
@@ -67,6 +71,30 @@ public static class UpdateCommand
             {
                 Console.WriteLine($"  [FAIL]    nixos  {ex.Message}");
                 failures.Add(("nixos", ex.Message));
+            }
+        }
+
+        if (darwinNixAvailable)
+        {
+            Console.WriteLine("  [update]  darwin");
+            try
+            {
+                var flakeRef = Environment.GetEnvironmentVariable("DEPEND_DARWIN_FLAKE");
+                foreach (var step in DarwinUpdate.Plan(flakeRef))
+                {
+                    var label = $"{step.Command} {string.Join(' ', step.Args)}";
+                    var exitCode = step.Sudo
+                        ? await Sudo.RunStreamingAsync(step.Command, step.Args, ct)
+                        : await ProcessRunner.RunStreamingAsync(step.Command, step.Args, ct);
+                    if (exitCode != 0)
+                        throw new InvalidOperationException($"{label} exited with code {exitCode}");
+                }
+                succeeded++;
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"  [FAIL]    darwin  {ex.Message}");
+                failures.Add(("darwin", ex.Message));
             }
         }
 
