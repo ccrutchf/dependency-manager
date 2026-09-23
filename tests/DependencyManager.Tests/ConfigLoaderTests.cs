@@ -371,6 +371,25 @@ public class ConfigLoaderTests
     }
 
     [Fact]
+    public void Comma_separated_tag_values_split_like_the_cli_and_env()
+    {
+        // `tags: desktop, laptop` is one YAML scalar; it must not become a single
+        // tag named "desktop, laptop" that can never match.
+        const string yaml = """
+            desktop:
+              tags: desktop, laptop
+              exclude_tags: [" crostini ,penguin", ""]
+              apt:
+                vim:
+            """;
+
+        var block = ConfigLoader.Parse(yaml).Blocks["desktop"];
+
+        block.Tags.ShouldBe(["desktop", "laptop"]);
+        block.ExcludeTags.ShouldBe(["crostini", "penguin"]);
+    }
+
+    [Fact]
     public void Blocks_without_tag_keys_have_null_tags()
     {
         const string yaml = """

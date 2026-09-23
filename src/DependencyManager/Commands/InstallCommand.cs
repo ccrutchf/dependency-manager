@@ -17,7 +17,7 @@ public static class InstallCommand
 
         var config = ConfigLoader.Load(configPath);
         var platform = PlatformInfo.Current();
-        if (!TagChecks.Enforce(config, tags, destructive: prune)) return 1;
+        if (!TagChecks.Enforce(config, platform, tags, destructive: prune)) return 1;
         var plan = Planner.Plan(config, platform, tags);
 
         var unsatisfied = plan.Requirements.Where(r => !r.Satisfied).ToList();

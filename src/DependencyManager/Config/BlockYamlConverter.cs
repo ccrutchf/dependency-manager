@@ -156,11 +156,17 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
     }
 
     // Tag keys are filters, but list-valued; a bare scalar (`tags: desktop`) is one tag.
+    // Values are comma-split like --tag/DEPEND_TAGS, so `tags: a, b` is two tags.
     private static List<string>? ReadStringOrList(IParser parser, ObjectDeserializer rootDeserializer)
     {
-        if (parser.TryConsume<Scalar>(out var scalar))
-            return string.IsNullOrWhiteSpace(scalar.Value) ? null : [scalar.Value];
-        return (List<string>?)rootDeserializer(typeof(List<string>));
+        List<string?>? raw = parser.TryConsume<Scalar>(out var scalar)
+            ? [scalar.Value]
+            : (List<string?>?)rootDeserializer(typeof(List<string?>));
+
+        var tags = (raw ?? [])
+            .SelectMany(v => (v ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .ToList();
+        return tags.Count == 0 ? null : tags;
     }
 
     public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer serializer) =>

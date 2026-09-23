@@ -1,4 +1,5 @@
 using DependencyManager.Config;
+using DependencyManager.Util;
 using Shouldly;
 using Xunit;
 
@@ -6,6 +7,9 @@ namespace DependencyManager.Tests;
 
 public class ActiveTagsTests
 {
+    private static PlatformInfo Linux => new("linux", "amd64", "6.6.0");
+    private static PlatformInfo Mac => new("osx", "arm64", "15.0");
+
     [Fact]
     public void No_cli_and_no_env_resolves_to_none()
     {
@@ -117,7 +121,7 @@ public class ActiveTagsTests
         });
         var tags = ActiveTags.Resolve(cli: null, env: "desktp");
 
-        var check = TagGuard.Check(config, tags, destructive: true);
+        var check = TagGuard.Check(config, Linux, tags, destructive: true);
 
         check.Refuse.ShouldBeTrue();
         check.Unknown.ShouldBe(["desktp"]);
@@ -134,7 +138,7 @@ public class ActiveTagsTests
         });
         var tags = ActiveTags.Resolve(cli: ["desktp"], env: null);
 
-        var check = TagGuard.Check(config, tags, destructive: false);
+        var check = TagGuard.Check(config, Linux, tags, destructive: false);
 
         check.Refuse.ShouldBeFalse();
         check.Message!.ShouldContain("desktp");
@@ -150,10 +154,75 @@ public class ActiveTagsTests
         });
         var tags = ActiveTags.Resolve(cli: ["desktop"], env: null);
 
-        var check = TagGuard.Check(config, tags, destructive: true);
+        var check = TagGuard.Check(config, Linux, tags, destructive: true);
 
         check.Refuse.ShouldBeFalse();
         check.Unknown.ShouldBeEmpty();
+        check.Message.ShouldBeNull();
+    }
+
+    private static ConfigFile LinuxTaggedConfig() => new(new Dictionary<string, Block>
+    {
+        ["linux-shared"] = new() { Platform = "linux" },
+        ["linux-desktop"] = new() { Platform = "linux", Tags = ["desktop"] },
+        ["crostini-bootstrap"] = new() { Platform = "linux", Tags = ["crostini"] },
+        ["vscode"] = new() { ExcludeTags = ["crostini"] },
+    });
+
+    [Fact]
+    public void Destructive_run_with_no_tags_set_is_refused_when_platform_has_tagged_blocks()
+    {
+        // DEPEND_TAGS unset (cron, un-exported shell): the tag-gated blocks silently
+        // drop out, and a prune would remove their packages.
+        var check = TagGuard.Check(LinuxTaggedConfig(), Linux, ActiveTags.None, destructive: true);
+
+        check.Refuse.ShouldBeTrue();
+        check.Message!.ShouldContain("no tags are active");
+        check.Message!.ShouldContain("linux-desktop");
+        check.Message!.ShouldContain("crostini-bootstrap");
+        check.Message!.ShouldContain("--tag ''");
+    }
+
+    [Fact]
+    public void Untagged_machine_whose_tagged_blocks_are_other_platforms_may_prune()
+    {
+        // The untagged Mac: every tag-gated block is linux-only.
+        var check = TagGuard.Check(LinuxTaggedConfig(), Mac, ActiveTags.None, destructive: true);
+
+        check.Refuse.ShouldBeFalse();
+        check.Message.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Explicit_empty_cli_tag_is_a_deliberate_untagged_prune()
+    {
+        var tags = ActiveTags.Resolve(cli: [""], env: null);
+
+        var check = TagGuard.Check(LinuxTaggedConfig(), Linux, tags, destructive: true);
+
+        check.Refuse.ShouldBeFalse();
+        check.Message.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Exclude_tags_alone_do_not_trigger_the_missing_tags_guard()
+    {
+        // Only `tags:` blocks drop out when no tags are active; exclude_tags blocks stay in.
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["vscode"] = new() { ExcludeTags = ["crostini"] },
+        });
+
+        TagGuard.Check(config, Linux, ActiveTags.None, destructive: true).Refuse.ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Non_destructive_run_with_no_tags_set_does_not_warn()
+    {
+        // plan already lists the tag-skipped blocks; an extra warning would be noise.
+        var check = TagGuard.Check(LinuxTaggedConfig(), Linux, ActiveTags.None, destructive: false);
+
+        check.Refuse.ShouldBeFalse();
         check.Message.ShouldBeNull();
     }
 }

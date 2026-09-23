@@ -23,7 +23,7 @@ public static class PruneCommand
 
         var config = ConfigLoader.Load(configPath);
         var platform = PlatformInfo.Current();
-        if (!TagChecks.Enforce(config, tags, destructive: apply)) return 1;
+        if (!TagChecks.Enforce(config, platform, tags, destructive: apply)) return 1;
         var plan = Planner.Plan(config, platform, tags);
 
         Console.WriteLine($"platform: {platform.Os}/{platform.Architecture} ({platform.Version})");

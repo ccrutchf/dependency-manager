@@ -1,3 +1,5 @@
+using DependencyManager.Util;
+
 namespace DependencyManager.Config;
 
 public enum TagSource
@@ -71,17 +73,37 @@ public sealed record ActiveTags(IReadOnlySet<string> Names, TagSource Source)
 public sealed record TagGuardResult(IReadOnlyList<string> Unknown, bool Refuse, string? Message);
 
 /// <summary>
-/// A mistyped tag silently shrinks the plan, and a prune would then remove real packages.
-/// Destructive runs (<c>install --prune</c>, <c>prune --apply</c>) refuse on unknown tags;
-/// everything else only warns.
+/// A mistyped or missing tag silently shrinks the plan, and a prune would then remove real
+/// packages. Destructive runs (<c>install --prune</c>, <c>prune --apply</c>) refuse when an
+/// active tag is unknown, or when no tags were given at all but this platform has
+/// <c>tags:</c>-gated blocks (e.g. <c>DEPEND_TAGS</c> not exported under cron). An explicit
+/// <c>--tag ''</c> is a deliberate untagged run and passes. Non-destructive runs only warn
+/// on unknown tags.
 /// </summary>
 public static class TagGuard
 {
-    public static TagGuardResult Check(ConfigFile config, ActiveTags tags, bool destructive)
+    public static TagGuardResult Check(ConfigFile config, PlatformInfo platform, ActiveTags tags, bool destructive)
     {
         var unknown = tags.UnknownIn(config);
-        if (unknown.Count == 0) return new TagGuardResult(unknown, Refuse: false, Message: null);
+        if (unknown.Count > 0) return UnknownTags(unknown, tags, destructive);
 
+        var ok = new TagGuardResult(unknown, Refuse: false, Message: null);
+        if (!destructive || tags.Source != TagSource.None) return ok;
+
+        var gated = config.Blocks
+            .Where(b => b.Value.Tags is { Count: > 0 } && BlockFilter.MatchesPlatform(b.Value, platform))
+            .Select(b => b.Key)
+            .ToList();
+        if (gated.Count == 0) return ok;
+
+        return new TagGuardResult(unknown, Refuse: true,
+            $"error: no tags are active (no --tag, {ActiveTags.EnvVar} unset), but tag-gated block(s) " +
+            $"{string.Join(", ", gated)} apply to this platform; refusing to prune them away. " +
+            "Pass --tag <name>, or --tag '' to prune as an untagged machine on purpose.");
+    }
+
+    private static TagGuardResult UnknownTags(IReadOnlyList<string> unknown, ActiveTags tags, bool destructive)
+    {
         var origin = tags.Source == TagSource.Env ? ActiveTags.EnvVar : "--tag";
         var list = string.Join(", ", unknown.Select(t => $"'{t}'"));
         var message = destructive

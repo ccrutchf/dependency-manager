@@ -33,7 +33,7 @@ public static class PlanCommand
 
         var config = ConfigLoader.Load(configPath);
         var platform = PlatformInfo.Current();
-        TagChecks.Enforce(config, tags, destructive: false);
+        TagChecks.Enforce(config, platform, tags, destructive: false);
         var plan = Planner.Plan(config, platform, tags);
 
         Console.WriteLine($"platform: {platform.Os}/{platform.Architecture} ({platform.Version})");
