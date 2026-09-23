@@ -7,10 +7,7 @@ namespace DependencyManager.Commands;
 
 public static class InstallCommand
 {
-    public static async Task<int> RunAsync(string configPath, bool failFast, CancellationToken ct) =>
-        await RunAsync(configPath, failFast, prune: false, ct);
-
-    public static async Task<int> RunAsync(string configPath, bool failFast, bool prune, CancellationToken ct)
+    public static async Task<int> RunAsync(string configPath, ActiveTags tags, bool failFast, bool prune, CancellationToken ct)
     {
         if (!File.Exists(configPath))
         {
@@ -20,7 +17,8 @@ public static class InstallCommand
 
         var config = ConfigLoader.Load(configPath);
         var platform = PlatformInfo.Current();
-        var plan = Planner.Plan(config, platform);
+        if (!TagChecks.Enforce(config, tags, destructive: prune)) return 1;
+        var plan = Planner.Plan(config, platform, tags);
 
         var unsatisfied = plan.Requirements.Where(r => !r.Satisfied).ToList();
         if (unsatisfied.Count > 0)

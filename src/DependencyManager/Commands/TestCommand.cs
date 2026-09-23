@@ -6,7 +6,7 @@ namespace DependencyManager.Commands;
 
 public static class TestCommand
 {
-    public static async Task<int> RunAsync(string configPath, CancellationToken ct)
+    public static async Task<int> RunAsync(string configPath, ActiveTags tags, CancellationToken ct)
     {
         if (!File.Exists(configPath))
         {
@@ -16,7 +16,8 @@ public static class TestCommand
 
         var config = ConfigLoader.Load(configPath);
         var platform = PlatformInfo.Current();
-        var plan = Planner.Plan(config, platform);
+        TagChecks.Enforce(config, tags, destructive: false);
+        var plan = Planner.Plan(config, platform, tags);
 
         var unsatisfied = plan.Requirements.Where(r => !r.Satisfied).ToList();
         var managers = InstallCommand.BuildManagers(plan);

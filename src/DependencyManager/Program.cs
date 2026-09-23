@@ -1,10 +1,16 @@
 using System.CommandLine;
 using DependencyManager.Commands;
+using DependencyManager.Config;
 
 var configOption = new Option<string>("--config", "-c")
 {
     Description = "Path to the YAML config file",
     DefaultValueFactory = _ => "packages.yaml",
+};
+
+var tagOption = new Option<string[]>("--tag")
+{
+    Description = "Activate a machine tag (repeatable, or comma-separated). Replaces DEPEND_TAGS when given",
 };
 
 var failFastOption = new Option<bool>("--fail-fast")
@@ -34,31 +40,41 @@ var applyOption = new Option<bool>("--apply")
 
 var planCmd = new Command("plan", "Print the resolved package plan without installing anything");
 planCmd.Options.Add(configOption);
+planCmd.Options.Add(tagOption);
 planCmd.Options.Add(planPruneOption);
 planCmd.SetAction((parseResult, ct) => PlanCommand.RunAsync(
     parseResult.GetValue(configOption)!,
+    ActiveTags.FromEnvironment(parseResult.GetValue(tagOption)),
     parseResult.GetValue(planPruneOption),
     ct));
 
 var installCmd = new Command("install", "Install every package in the resolved plan");
 installCmd.Options.Add(configOption);
+installCmd.Options.Add(tagOption);
 installCmd.Options.Add(failFastOption);
 installCmd.Options.Add(pruneOption);
 installCmd.SetAction((parseResult, ct) => InstallCommand.RunAsync(
     parseResult.GetValue(configOption)!,
+    ActiveTags.FromEnvironment(parseResult.GetValue(tagOption)),
     parseResult.GetValue(failFastOption),
     parseResult.GetValue(pruneOption),
     ct));
 
 var testCmd = new Command("test", "Exit 0 if every package in the plan is installed, else 1");
 testCmd.Options.Add(configOption);
-testCmd.SetAction((parseResult, ct) => TestCommand.RunAsync(parseResult.GetValue(configOption)!, ct));
+testCmd.Options.Add(tagOption);
+testCmd.SetAction((parseResult, ct) => TestCommand.RunAsync(
+    parseResult.GetValue(configOption)!,
+    ActiveTags.FromEnvironment(parseResult.GetValue(tagOption)),
+    ct));
 
-var pruneCmd = new Command("prune", "List (or with --prune, remove) installed packages not in the plan");
+var pruneCmd = new Command("prune", "List (or with --apply, remove) installed packages not in the plan");
 pruneCmd.Options.Add(configOption);
+pruneCmd.Options.Add(tagOption);
 pruneCmd.Options.Add(applyOption);
 pruneCmd.SetAction((parseResult, ct) => PruneCommand.RunAsync(
     parseResult.GetValue(configOption)!,
+    ActiveTags.FromEnvironment(parseResult.GetValue(tagOption)),
     parseResult.GetValue(applyOption),
     ct));
 

@@ -684,4 +684,102 @@ public class PlannerTests
         plan.ShouldContain(p => p.Manager == ManagerKind.Brew);
         plan.ShouldContain(p => p.Manager == ManagerKind.Cask);
     }
+
+    // The intended multi-machine layout: one file, three machine types.
+    private static ConfigFile MultiMachineConfig() => new(new Dictionary<string, Block>
+    {
+        ["linux-shared"] = new()
+        {
+            Platform = "linux",
+            Flatpak = new Dictionary<string, PackageSpec> { ["app.zen_browser.zen"] = new() },
+        },
+        ["linux-desktop"] = new()
+        {
+            Platform = "linux",
+            Tags = ["desktop"],
+            Flatpak = new Dictionary<string, PackageSpec> { ["org.gimp.GIMP"] = new() },
+        },
+        ["crostini-bootstrap"] = new()
+        {
+            Platform = "linux",
+            Tags = ["crostini"],
+            Apt = new Dictionary<string, PackageSpec> { ["flatpak"] = new() },
+        },
+        ["vscode-extensions"] = new()
+        {
+            Platform = "all",
+            ExcludeTags = ["crostini"],
+            Vscode = new Dictionary<string, PackageSpec> { ["ms-python.python"] = new() },
+        },
+    });
+
+    private static List<string> Ids(ConfigFile config, PlatformInfo platform, ActiveTags tags) =>
+        Planner.Plan(config, platform, tags).Packages.Select(p => p.Id).Order(StringComparer.Ordinal).ToList();
+
+    [Fact]
+    public void Desktop_tag_gets_shared_desktop_and_vscode_blocks()
+    {
+        Ids(MultiMachineConfig(), Linux, ActiveTags.Resolve(null, "desktop"))
+            .ShouldBe(["app.zen_browser.zen", "ms-python.python", "org.gimp.GIMP"]);
+    }
+
+    [Fact]
+    public void Crostini_tag_gets_shared_and_bootstrap_but_not_vscode()
+    {
+        Ids(MultiMachineConfig(), Linux, ActiveTags.Resolve(null, "crostini"))
+            .ShouldBe(["app.zen_browser.zen", "flatpak"]);
+    }
+
+    [Fact]
+    public void Untagged_mac_gets_only_the_platform_all_vscode_block()
+    {
+        var mac = new PlatformInfo("osx", "arm64", "26.4");
+        Ids(MultiMachineConfig(), mac, ActiveTags.None).ShouldBe(["ms-python.python"]);
+    }
+
+    [Fact]
+    public void Two_arg_plan_treats_no_tags_as_active()
+    {
+        Ids(MultiMachineConfig(), Linux, ActiveTags.None)
+            .ShouldBe(Planner.Plan(MultiMachineConfig(), Linux).Packages.Select(p => p.Id).Order(StringComparer.Ordinal).ToList());
+        Ids(MultiMachineConfig(), Linux, ActiveTags.None).ShouldBe(["app.zen_browser.zen", "ms-python.python"]);
+    }
+
+    [Fact]
+    public void Tag_skipped_block_contributes_no_requirements_or_ppas()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["desktop"] = new()
+            {
+                Tags = ["desktop"],
+                Requires = ["definitely-not-a-real-binary-xyz"],
+                Ppas = ["ppa:example/ppa"],
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux, ActiveTags.Resolve(null, "crostini"));
+
+        plan.Requirements.ShouldBeEmpty();
+        plan.AptPpas.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Tag_skipped_blocks_lists_only_blocks_skipped_because_of_tags()
+    {
+        var skipped = Planner.TagSkippedBlocks(MultiMachineConfig(), Linux, ActiveTags.Resolve(null, "crostini"));
+
+        // Blocks skipped for platform reasons are not tag skips.
+        skipped.Select(s => s.BlockName).ShouldBe(["linux-desktop", "vscode-extensions"]);
+        skipped[0].Reason.ShouldBe("requires one of tags [desktop]; active: [crostini]");
+        skipped[1].Reason.ShouldBe("excluded by active tag(s) [crostini]");
+    }
+
+    [Fact]
+    public void Tag_skipped_blocks_ignores_blocks_for_other_platforms()
+    {
+        var mac = new PlatformInfo("osx", "arm64", "26.4");
+
+        Planner.TagSkippedBlocks(MultiMachineConfig(), mac, ActiveTags.None).ShouldBeEmpty();
+    }
 }

@@ -6,7 +6,7 @@ namespace DependencyManager.Commands;
 
 public static class PruneCommand
 {
-    public static async Task<int> RunAsync(string configPath, bool apply, CancellationToken ct)
+    public static async Task<int> RunAsync(string configPath, ActiveTags tags, bool apply, CancellationToken ct)
     {
         if (!File.Exists(configPath))
         {
@@ -23,7 +23,8 @@ public static class PruneCommand
 
         var config = ConfigLoader.Load(configPath);
         var platform = PlatformInfo.Current();
-        var plan = Planner.Plan(config, platform);
+        if (!TagChecks.Enforce(config, tags, destructive: apply)) return 1;
+        var plan = Planner.Plan(config, platform, tags);
 
         Console.WriteLine($"platform: {platform.Os}/{platform.Architecture} ({platform.Version})");
         Console.WriteLine(apply
