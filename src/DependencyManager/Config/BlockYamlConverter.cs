@@ -20,6 +20,8 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
     private const string PpasKey = "ppas";
     private const string AptSourcesKey = "apt_sources";
     private const string RequiresKey = "requires";
+    private const string TagsKey = "tags";
+    private const string ExcludeTagsKey = "exclude_tags";
 
     public bool Accepts(Type type) => type == typeof(Block);
 
@@ -33,6 +35,8 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
         List<string>? ppas = null;
         Dictionary<string, AptSource>? aptSources = null;
         List<string>? requires = null;
+        List<string>? tags = null;
+        List<string>? excludeTags = null;
         Dictionary<string, PackageSpec>? apt = null;
         Dictionary<string, PackageSpec>? snap = null;
         Dictionary<string, PackageSpec>? flatpak = null;
@@ -75,6 +79,14 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             {
                 aptSources = (Dictionary<string, AptSource>?)rootDeserializer(typeof(Dictionary<string, AptSource>));
             }
+            else if (string.Equals(key, TagsKey, StringComparison.OrdinalIgnoreCase))
+            {
+                tags = ReadStringOrList(parser, rootDeserializer);
+            }
+            else if (string.Equals(key, ExcludeTagsKey, StringComparison.OrdinalIgnoreCase))
+            {
+                excludeTags = ReadStringOrList(parser, rootDeserializer);
+            }
             else if (string.Equals(key, RequiresKey, StringComparison.OrdinalIgnoreCase))
             {
                 requires = (List<string>?)rootDeserializer(typeof(List<string>));
@@ -107,7 +119,7 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             }
             else
             {
-                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/ppas/apt_sources/requires or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm/firefox/zen/chrome/chromium/brave/brew/cask/mas)");
+                Console.Error.WriteLine($"warning: unknown key '{key}' in block (expected platform/architecture/version/tags/exclude_tags/ppas/apt_sources/requires or apt/snap/flatpak/deb/pip/pipx/script/vscode/cargo/nvm/firefox/zen/chrome/chromium/brave/brew/cask/mas)");
                 _ = rootDeserializer(typeof(object));
             }
         }
@@ -120,6 +132,8 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             Ppas = ppas,
             AptSources = aptSources,
             Requires = requires,
+            Tags = tags,
+            ExcludeTags = excludeTags,
             Apt = apt,
             Snap = snap,
             Flatpak = flatpak,
@@ -139,6 +153,20 @@ public sealed class BlockYamlConverter : IYamlTypeConverter
             Cask = cask,
             Mas = mas,
         };
+    }
+
+    // Tag keys are filters, but list-valued; a bare scalar (`tags: desktop`) is one tag.
+    // Values are comma-split like --tag/DEPEND_TAGS, so `tags: a, b` is two tags.
+    private static List<string>? ReadStringOrList(IParser parser, ObjectDeserializer rootDeserializer)
+    {
+        List<string?>? raw = parser.TryConsume<Scalar>(out var scalar)
+            ? [scalar.Value]
+            : (List<string?>?)rootDeserializer(typeof(List<string?>));
+
+        var tags = (raw ?? [])
+            .SelectMany(v => (v ?? string.Empty).Split(',', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries))
+            .ToList();
+        return tags.Count == 0 ? null : tags;
     }
 
     public void WriteYaml(IEmitter emitter, object? value, Type type, ObjectSerializer serializer) =>

@@ -6,16 +6,14 @@ namespace DependencyManager.Commands;
 
 public static class PlanCommand
 {
-    public static int Run(string configPath) => PrintPlan(configPath, out _);
-
     /// <summary>
     /// Prints the resolved plan and, when <paramref name="prune"/> is set, also
     /// previews the removals that `install --prune` would make — a dry-run prune,
     /// so `plan --prune` is a complete preview of `install --prune`.
     /// </summary>
-    public static async Task<int> RunAsync(string configPath, bool prune, CancellationToken ct)
+    public static async Task<int> RunAsync(string configPath, ActiveTags tags, bool prune, CancellationToken ct)
     {
-        var rc = PrintPlan(configPath, out var plan);
+        var rc = PrintPlan(configPath, tags, out var plan);
         if (rc != 0 || !prune || plan is null) return rc;
 
         Console.WriteLine();
@@ -24,7 +22,7 @@ public static class PlanCommand
         return await runner.PruneAsync(plan.Packages, apply: false, ct);
     }
 
-    private static int PrintPlan(string configPath, out ResolvedPlan? resolved)
+    private static int PrintPlan(string configPath, ActiveTags tags, out ResolvedPlan? resolved)
     {
         resolved = null;
         if (!File.Exists(configPath))
@@ -35,9 +33,18 @@ public static class PlanCommand
 
         var config = ConfigLoader.Load(configPath);
         var platform = PlatformInfo.Current();
-        var plan = Planner.Plan(config, platform);
+        TagChecks.Enforce(config, platform, tags, destructive: false);
+        var plan = Planner.Plan(config, platform, tags);
 
         Console.WriteLine($"platform: {platform.Os}/{platform.Architecture} ({platform.Version})");
+        Console.WriteLine($"tags: {tags.Describe()}");
+        var tagSkipped = Planner.TagSkippedBlocks(config, platform, tags);
+        if (tagSkipped.Count > 0)
+        {
+            Console.WriteLine($"skipped by tags ({tagSkipped.Count}):");
+            foreach (var s in tagSkipped)
+                Console.WriteLine($"  {s.BlockName}  ({s.Reason})");
+        }
         if (plan.Requirements.Count > 0)
         {
             Console.WriteLine($"requires ({plan.Requirements.Count}):");

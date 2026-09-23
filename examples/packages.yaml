@@ -1,5 +1,6 @@
 # Sample packages.yaml — covers every provider and the filter keys.
 # Run `depend plan --config examples/packages.yaml` to preview the resolved plan.
+# Try `--tag crostini` (or DEPEND_TAGS=crostini) to see machine tags reshape the plan.
 
 all:
   platform: all
@@ -60,6 +61,8 @@ mac-apps:
 
 vscode-extensions:
   platform: all
+  # Every machine except Crostini containers (an untagged Mac still gets these).
+  exclude_tags: [crostini]
   requires:
     - code
   vscode:
@@ -108,3 +111,12 @@ user-tools:
       dependencies: [nvm]
     "22":
       dependencies: [nvm]
+
+crostini-bootstrap:
+  platform: linux
+  # Machine tags tell apart machines the platform filters can't (same OS/arch).
+  # Active tags come from `--tag` (repeatable) or else DEPEND_TAGS=a,b. A block
+  # with `tags:` applies only when one of them is active; `exclude_tags:` skips it.
+  tags: [crostini]
+  apt:
+    flatpak:

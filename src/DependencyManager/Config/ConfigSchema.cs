@@ -30,6 +30,11 @@ public sealed record Block
     public string Architecture { get; init; } = "all";
     public string? Version { get; init; }
 
+    // Machine-tag filters (see ActiveTags). Tags: applies only if any listed tag is
+    // active. ExcludeTags: skipped if any listed tag is active. Null/empty = no constraint.
+    public List<string>? Tags { get; init; }
+    public List<string>? ExcludeTags { get; init; }
+
     public List<string>? Ppas { get; init; }
     public Dictionary<string, AptSource>? AptSources { get; init; }
 
@@ -105,6 +110,8 @@ public sealed record ResolvedPackage(
 public sealed record ResolvedAptSource(string Name, AptSource Source, string BlockName);
 
 public sealed record ResolvedRequirement(string Name, string BlockName, bool Satisfied);
+
+public sealed record TagSkippedBlock(string BlockName, string Reason);
 
 public sealed record ResolvedPlan(
     IReadOnlyList<ResolvedPackage> Packages,

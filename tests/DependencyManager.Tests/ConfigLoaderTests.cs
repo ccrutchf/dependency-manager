@@ -326,4 +326,81 @@ public class ConfigLoaderTests
 
         capture.ToString().ShouldContain("warning: unknown key 'totally_made_up_provider'");
     }
+
+    [Fact]
+    public void Parses_tags_and_exclude_tags()
+    {
+        const string yaml = """
+            linux-desktop:
+              platform: linux
+              tags: [desktop, laptop]
+              flatpak:
+                org.gimp.GIMP:
+
+            vscode-extensions:
+              platform: all
+              exclude_tags:
+                - crostini
+              vscode:
+                ms-python.python:
+            """;
+
+        var config = ConfigLoader.Parse(yaml);
+
+        config.Blocks["linux-desktop"].Tags.ShouldBe(["desktop", "laptop"]);
+        config.Blocks["linux-desktop"].ExcludeTags.ShouldBeNull();
+        config.Blocks["vscode-extensions"].ExcludeTags.ShouldBe(["crostini"]);
+        config.Blocks["vscode-extensions"].Tags.ShouldBeNull();
+    }
+
+    [Fact]
+    public void Scalar_tag_value_is_a_single_tag()
+    {
+        const string yaml = """
+            crostini:
+              tags: crostini
+              exclude_tags: desktop
+              apt:
+                flatpak:
+            """;
+
+        var block = ConfigLoader.Parse(yaml).Blocks["crostini"];
+
+        block.Tags.ShouldBe(["crostini"]);
+        block.ExcludeTags.ShouldBe(["desktop"]);
+    }
+
+    [Fact]
+    public void Comma_separated_tag_values_split_like_the_cli_and_env()
+    {
+        // `tags: desktop, laptop` is one YAML scalar; it must not become a single
+        // tag named "desktop, laptop" that can never match.
+        const string yaml = """
+            desktop:
+              tags: desktop, laptop
+              exclude_tags: [" crostini ,penguin", ""]
+              apt:
+                vim:
+            """;
+
+        var block = ConfigLoader.Parse(yaml).Blocks["desktop"];
+
+        block.Tags.ShouldBe(["desktop", "laptop"]);
+        block.ExcludeTags.ShouldBe(["crostini", "penguin"]);
+    }
+
+    [Fact]
+    public void Blocks_without_tag_keys_have_null_tags()
+    {
+        const string yaml = """
+            minimal:
+              apt:
+                vim:
+            """;
+
+        var block = ConfigLoader.Parse(yaml).Blocks["minimal"];
+
+        block.Tags.ShouldBeNull();
+        block.ExcludeTags.ShouldBeNull();
+    }
 }

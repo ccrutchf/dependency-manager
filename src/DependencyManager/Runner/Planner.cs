@@ -5,7 +5,10 @@ namespace DependencyManager.Runner;
 
 public static class Planner
 {
-    public static ResolvedPlan Plan(ConfigFile config, PlatformInfo platform)
+    public static ResolvedPlan Plan(ConfigFile config, PlatformInfo platform) =>
+        Plan(config, platform, ActiveTags.None);
+
+    public static ResolvedPlan Plan(ConfigFile config, PlatformInfo platform, ActiveTags tags)
     {
         var resolved = new Dictionary<(ManagerKind, string), ResolvedPackage>();
         var ppas = new List<string>();
@@ -16,7 +19,7 @@ public static class Planner
 
         foreach (var (blockName, block) in config.Blocks)
         {
-            if (!BlockFilter.Matches(block, platform)) continue;
+            if (!BlockFilter.Matches(block, platform, tags)) continue;
             Flatten(block.Apt, ManagerKind.Apt, blockName, resolved);
             Flatten(block.Snap, ManagerKind.Snap, blockName, resolved);
             Flatten(block.Flatpak, ManagerKind.Flatpak, blockName, resolved);
@@ -64,6 +67,18 @@ public static class Planner
         var resolvedSources = aptSourceOrder.Select(n => aptSources[n]).ToList();
         return new ResolvedPlan(TopoSort(resolved.Values.ToList()), ppas, resolvedSources, requirements);
     }
+
+    /// <summary>
+    /// Blocks that match this platform but were dropped by their <c>tags</c>/<c>exclude_tags</c>,
+    /// with the reason — so <c>plan</c> can show what tagging left out.
+    /// </summary>
+    public static IReadOnlyList<TagSkippedBlock> TagSkippedBlocks(ConfigFile config, PlatformInfo platform, ActiveTags tags) =>
+        config.Blocks
+            .Where(b => BlockFilter.MatchesPlatform(b.Value, platform))
+            .Select(b => (Name: b.Key, Reason: BlockFilter.TagSkipReason(b.Value, tags)))
+            .Where(b => b.Reason is not null)
+            .Select(b => new TagSkippedBlock(b.Name, b.Reason!))
+            .ToList();
 
     private static void Flatten(
         Dictionary<string, PackageSpec>? section,
