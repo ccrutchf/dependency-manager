@@ -68,17 +68,22 @@ public static class PlanCommand
         }
         Console.WriteLine($"resolved {plan.Packages.Count} package(s):");
         foreach (var pkg in plan.Packages)
-        {
-            var deps = pkg.Spec.Dependencies is { Count: > 0 }
-                ? $"  deps=[{string.Join(", ", pkg.Spec.Dependencies)}]"
-                : string.Empty;
-            Console.WriteLine($"  {pkg.Manager,-8} {pkg.Id}  (from {pkg.BlockName}){deps}");
-        }
+            Console.WriteLine(FormatPackage(pkg));
 
         if (RootCheck.PlanRequiresSudo(plan))
             Console.WriteLine("note: this plan will invoke sudo to install (apt/snap/PPAs, browser extension policies, or system-scope packages present)");
 
         resolved = plan;
         return 0;
+    }
+
+    /// <summary>One plan line; url-installed entries (deb, flatpak bundles) show their url.</summary>
+    public static string FormatPackage(ResolvedPackage pkg)
+    {
+        var url = string.IsNullOrWhiteSpace(pkg.Spec.Url) ? string.Empty : $"  url={pkg.Spec.Url}";
+        var deps = pkg.Spec.Dependencies is { Count: > 0 }
+            ? $"  deps=[{string.Join(", ", pkg.Spec.Dependencies)}]"
+            : string.Empty;
+        return $"  {pkg.Manager,-8} {pkg.Id}  (from {pkg.BlockName}){url}{deps}";
     }
 }

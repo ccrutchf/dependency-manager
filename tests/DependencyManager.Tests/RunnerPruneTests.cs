@@ -120,6 +120,29 @@ public class RunnerPruneTests
         fake.GcCalls.ShouldBe(0);
     }
 
+    [Fact]
+    public async Task Prune_never_removes_a_declared_flatpak_bundle_app()
+    {
+        // A bundle-installed app is listed by `flatpak list --app` under its app id,
+        // just like a Flathub app, so declaring it by that id (with a url) keeps it.
+        var fake = new FakePrunableManager
+        {
+            Kind = ManagerKind.Flatpak,
+            InstalledExplicit = new List<string> { "io.github.crealityofficial.CrealityPrint", "org.example.Undeclared" },
+        };
+        var runner = new Runner.Runner(new IPackageManager[] { fake });
+        var bundle = new ResolvedPackage(
+            ManagerKind.Flatpak,
+            "io.github.crealityofficial.CrealityPrint",
+            new PackageSpec { Url = "https://example.com/CrealityPrint.flatpak", Sha256 = "abc" },
+            "block");
+
+        var rc = await SilentRun(() => runner.PruneAsync(new[] { bundle }, apply: true, CancellationToken.None));
+
+        rc.ShouldBe(0);
+        fake.Uninstalled.ShouldBe(new[] { "org.example.Undeclared" });
+    }
+
     private static async Task<int> SilentRun(Func<Task<int>> action)
     {
         var prev = Console.Out;
