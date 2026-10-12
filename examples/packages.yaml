@@ -27,6 +27,11 @@ linux-desktop:
   flatpak:
     com.visualstudio.code:
       source: flathub
+    # No Flathub listing: install a vendor's .flatpak bundle from a url. The key
+    # must be the bundle's app id; changing url or sha256 reinstalls (upgrades) it.
+    io.github.crealityofficial.CrealityPrint:
+      url: https://github.com/CrealityOfficial/CrealityPrint/releases/download/v7.3.0/CrealityPrint-Linux-flatpak_V7.3.0-Release_x86_64.flatpak
+      sha256: 50a281ad21e73c7132ed20f1301ac8cc7c8cb4dfbea6b7d6afbeade6a8856d91
   deb:
     slack-desktop:
       url: https://downloads.slack-edge.com/releases/linux/4.38.125/prod/x64/slack-desktop-4.38.125-amd64.deb
