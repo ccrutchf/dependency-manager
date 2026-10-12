@@ -4,14 +4,14 @@ using Xunit;
 
 namespace DependencyManager.Tests;
 
-public class DebCacheTests : IDisposable
+public class DownloadCacheTests : IDisposable
 {
     private readonly string _tempDir;
     private readonly string _cachePath;
 
-    public DebCacheTests()
+    public DownloadCacheTests()
     {
-        _tempDir = Path.Combine(Path.GetTempPath(), $"depend-debcache-{Guid.NewGuid():N}");
+        _tempDir = Path.Combine(Path.GetTempPath(), $"depend-downloadcache-{Guid.NewGuid():N}");
         _cachePath = Path.Combine(_tempDir, "debs.json");
     }
 
@@ -24,7 +24,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task LoadAsync_returns_empty_when_file_does_not_exist()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
 
         var entries = await cache.LoadAsync(CancellationToken.None);
 
@@ -34,7 +34,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task RecordAsync_creates_parent_directory_and_writes_entry()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
         const string url = "https://example.com/slack.deb";
         const string sha = "abc123";
 
@@ -49,7 +49,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task RecordAsync_overwrites_existing_entry_for_same_url()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
         const string url = "https://example.com/slack.deb";
 
         await cache.RecordAsync(url, "old-sha", CancellationToken.None);
@@ -68,7 +68,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task RecordAsync_keeps_unrelated_entries_intact()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
 
         await cache.RecordAsync("https://a.example/pkg.deb", "sha-a", CancellationToken.None);
         await cache.RecordAsync("https://b.example/pkg.deb", "sha-b", CancellationToken.None);
@@ -82,8 +82,8 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task SaveAsync_round_trips_multiple_entries()
     {
-        var cache = new DebCache(_cachePath);
-        var input = new Dictionary<string, DebCacheEntry>
+        var cache = new DownloadCache(_cachePath);
+        var input = new Dictionary<string, DownloadCacheEntry>
         {
             ["https://a.example/pkg.deb"] = new("sha-a", DateTimeOffset.UtcNow),
             ["https://b.example/pkg.deb"] = new("sha-b", DateTimeOffset.UtcNow.AddMinutes(-5)),
@@ -100,7 +100,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task SaveAsync_does_not_leave_tmp_file_behind()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
 
         await cache.RecordAsync("https://example.com/pkg.deb", "sha", CancellationToken.None);
 
@@ -110,7 +110,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task SaveAsync_emits_human_readable_json()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
 
         await cache.RecordAsync("https://example.com/pkg.deb", "abc", CancellationToken.None);
 
@@ -128,7 +128,7 @@ public class DebCacheTests : IDisposable
         try
         {
             Environment.SetEnvironmentVariable("XDG_CACHE_HOME", "/tmp/xdg-cache-test");
-            var path = DebCache.DefaultPath();
+            var path = DownloadCache.DefaultPath(DownloadCache.DebsFile);
             path.ShouldBe(Path.Combine("/tmp/xdg-cache-test", "depend", "debs.json"));
         }
         finally
@@ -144,7 +144,7 @@ public class DebCacheTests : IDisposable
         try
         {
             Environment.SetEnvironmentVariable("XDG_CACHE_HOME", null);
-            var path = DebCache.DefaultPath();
+            var path = DownloadCache.DefaultPath(DownloadCache.DebsFile);
             var expected = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
                 ".cache", "depend", "debs.json");
@@ -159,7 +159,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task RecordAsync_with_packageId_evicts_other_urls_for_same_package()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
         const string oldUrl = "https://example.com/foo-0.1.deb";
         const string newUrl = "https://example.com/foo-0.2.deb";
 
@@ -175,7 +175,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task RecordAsync_with_packageId_keeps_entries_for_different_packages()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
 
         await cache.RecordAsync("https://a.example/foo.deb", "sha-a", "foo", CancellationToken.None);
         await cache.RecordAsync("https://b.example/bar.deb", "sha-b", "bar", CancellationToken.None);
@@ -187,7 +187,7 @@ public class DebCacheTests : IDisposable
     [Fact]
     public async Task RecordAsync_without_packageId_does_not_evict_existing_entries()
     {
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
 
         await cache.RecordAsync("https://a.example/foo.deb", "sha-a", "foo", CancellationToken.None);
         await cache.RecordAsync("https://b.example/foo.deb", "sha-b", CancellationToken.None);
@@ -201,10 +201,65 @@ public class DebCacheTests : IDisposable
     {
         Directory.CreateDirectory(_tempDir);
         await File.WriteAllTextAsync(_cachePath, "null");
-        var cache = new DebCache(_cachePath);
+        var cache = new DownloadCache(_cachePath);
 
         var entries = await cache.LoadAsync(CancellationToken.None);
 
         entries.ShouldBeEmpty();
+    }
+}
+
+public class DownloadCacheIsCurrentTests
+{
+    private const string Url = "https://example.com/app.flatpak";
+
+    private static Dictionary<string, DownloadCacheEntry> Entries(string sha, string? packageId = null) =>
+        new() { [Url] = new DownloadCacheEntry(sha, DateTimeOffset.UtcNow, packageId) };
+
+    [Fact]
+    public void Is_not_current_when_url_was_never_recorded()
+    {
+        DownloadCache.IsCurrent(new Dictionary<string, DownloadCacheEntry>(), Url, sha256: null, packageId: null)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Is_current_when_url_recorded_and_no_sha_pinned()
+    {
+        DownloadCache.IsCurrent(Entries("abc"), Url, sha256: null, packageId: null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Is_not_current_when_a_different_url_was_recorded()
+    {
+        // Changing the url in the YAML (e.g. a new release) must trigger a reinstall.
+        DownloadCache.IsCurrent(Entries("abc"), "https://example.com/v2.flatpak", sha256: null, packageId: null)
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Is_current_when_pinned_sha_matches_ignoring_case_and_dashes()
+    {
+        DownloadCache.IsCurrent(Entries("abcdef"), Url, sha256: "AB-CD-EF", packageId: null).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Is_not_current_when_pinned_sha_changed()
+    {
+        DownloadCache.IsCurrent(Entries("abc"), Url, sha256: "def", packageId: null).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Is_not_current_when_recorded_for_a_different_package()
+    {
+        DownloadCache.IsCurrent(Entries("abc", "org.example.Other"), Url, sha256: null, packageId: "org.example.App")
+            .ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Is_current_when_recorded_package_matches_ignoring_case()
+    {
+        DownloadCache.IsCurrent(Entries("abc", "org.example.App"), Url, sha256: null, packageId: "ORG.example.app")
+            .ShouldBeTrue();
     }
 }
