@@ -42,6 +42,17 @@
 
           selfContainedBuild = true;
 
+          # .NET 10's ReadyToRun precompiled images intermittently corrupt the heap
+          # on macOS: an AccessViolationException that roams through the framework's
+          # System.Net.Sockets / System.IO.Pipes code when depend spawns many child
+          # processes (reliably reproduced by `install --prune`). Forcing the JIT to
+          # compile those methods instead of using the R2R images is stable
+          # (DOTNET_ReadyToRun=0 → 0 crashes over hundreds of runs; the R2R default
+          # crashes ~40%). macOS-only: Linux R2R is fine, and JIT-only costs startup.
+          makeWrapperArgs = pkgs.lib.optionals pkgs.stdenv.isDarwin [
+            "--set" "DOTNET_ReadyToRun" "0"
+          ];
+
           meta = {
             description = "Declarative package manager that drives apt, snap, flatpak, pip, pipx, cargo, nvm and scripts from a YAML manifest";
             homepage = "https://github.com/ccrutchf/dependency-manager";
