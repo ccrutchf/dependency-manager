@@ -24,6 +24,8 @@ public static class ProcessRunner
         using var process = Process.Start(psi)
             ?? throw new InvalidOperationException($"Failed to start process: {fileName}");
 
+        // Read both streams concurrently, then await exit, so a chatty child can't
+        // deadlock by filling one pipe's buffer while we block on the other.
         var stdOutTask = process.StandardOutput.ReadToEndAsync(ct);
         var stdErrTask = process.StandardError.ReadToEndAsync(ct);
         await process.WaitForExitAsync(ct);
