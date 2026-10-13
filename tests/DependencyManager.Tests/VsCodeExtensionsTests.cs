@@ -1,4 +1,6 @@
+using DependencyManager.Config;
 using DependencyManager.Managers;
+using DependencyManager.Util;
 using Shouldly;
 using Xunit;
 
@@ -78,5 +80,83 @@ public class VsCodeExtensionsTests
         var installed = new[] { "a.one", "b.two" };
         VsCodeExtensions.Leaves(installed, System.Array.Empty<string>())
             .ShouldBe(["a.one", "b.two"]);
+    }
+
+    private static Dictionary<string, DownloadCacheEntry> VsixCache(params (string Location, string Id)[] rows) =>
+        rows.ToDictionary(r => r.Location, r => new DownloadCacheEntry("aaa", DateTimeOffset.UtcNow, r.Id));
+
+    [Fact]
+    public void Updatable_skips_extensions_installed_from_a_vsix()
+    {
+        var installed = new[] { "ms-python.python", "PhoneDash.phone-dash-focus", "mkhl.direnv" };
+        var cache = VsixCache(("/home/alice/ext.vsix", "phonedash.phone-dash-focus"));
+
+        VsCodeExtensions.Updatable(installed, cache).ShouldBe(["ms-python.python", "mkhl.direnv"]);
+    }
+
+    [Fact]
+    public void Updatable_is_every_installed_extension_when_nothing_came_from_a_vsix()
+    {
+        var installed = new[] { "ms-python.python", "mkhl.direnv" };
+
+        VsCodeExtensions.Updatable(installed, new Dictionary<string, DownloadCacheEntry>())
+            .ShouldBe(["ms-python.python", "mkhl.direnv"]);
+    }
+
+    [Fact]
+    public void Updatable_ignores_cache_entries_without_an_id()
+    {
+        var cache = new Dictionary<string, DownloadCacheEntry>
+        {
+            ["/x.vsix"] = new("aaa", DateTimeOffset.UtcNow, PackageId: null),
+        };
+
+        VsCodeExtensions.Updatable(["a.one"], cache).ShouldBe(["a.one"]);
+    }
+
+    [Fact]
+    public void Marketplace_entry_is_installed_when_listed()
+    {
+        var none = new Dictionary<string, DownloadCacheEntry>();
+
+        VsCodeExtensions.IsMarketplaceInstalled(["ms-python.python"], "MS-Python.Python", none).ShouldBeTrue();
+        VsCodeExtensions.IsMarketplaceInstalled(["mkhl.direnv"], "ms-python.python", none).ShouldBeFalse();
+    }
+
+    [Fact]
+    public void Marketplace_entry_previously_installed_from_a_vsix_is_reinstalled()
+    {
+        // Dropping url: from an entry switches it back to the Marketplace; until that
+        // reinstall happens, update would keep skipping it as a vsix install.
+        var cache = VsixCache(("/home/alice/ext.vsix", "a.one"));
+
+        VsCodeExtensions.IsMarketplaceInstalled(["a.one"], "a.one", cache).ShouldBeFalse();
+    }
+}
+
+public class VsCodeManagerTests
+{
+    [Fact]
+    public void Entry_without_url_installs_from_the_marketplace_by_id()
+    {
+        VsCodeManager.IsVsix(new PackageSpec()).ShouldBeFalse();
+        VsCodeManager.IsVsix(new PackageSpec { Url = " " }).ShouldBeFalse();
+        VsCodeManager.InstallArgs("ms-python.python")
+            .ShouldBe(["--install-extension", "ms-python.python", "--force"]);
+    }
+
+    [Fact]
+    public void Entry_without_url_uses_the_source_binary_when_given()
+    {
+        VsCodeManager.Binary(new PackageSpec()).ShouldBe("code");
+        VsCodeManager.Binary(new PackageSpec { Source = "codium" }).ShouldBe("codium");
+    }
+
+    [Fact]
+    public void Entry_with_url_installs_the_vsix_file()
+    {
+        VsCodeManager.IsVsix(new PackageSpec { Url = "~/ext.vsix" }).ShouldBeTrue();
+        VsCodeManager.InstallArgs("/home/alice/ext.vsix")
+            .ShouldBe(["--install-extension", "/home/alice/ext.vsix", "--force"]);
     }
 }

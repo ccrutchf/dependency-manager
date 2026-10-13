@@ -11,12 +11,13 @@ public sealed record DownloadCacheEntry(
 /// <summary>
 /// Records which url (and sha256) each url-installed package came from, so a
 /// changed url or hash in the YAML is seen as "not installed" and reinstalls.
-/// One JSON file per provider under $XDG_CACHE_HOME/depend (debs.json, flatpaks.json).
+/// One JSON file per provider under $XDG_CACHE_HOME/depend (debs.json, flatpaks.json, vsix.json).
 /// </summary>
 public sealed class DownloadCache
 {
     public const string DebsFile = "debs.json";
     public const string FlatpaksFile = "flatpaks.json";
+    public const string VsixFile = "vsix.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -111,6 +112,19 @@ public sealed class DownloadCache
             foreach (var key in stale) entries.Remove(key);
         }
         entries[url] = new DownloadCacheEntry(sha256, DateTimeOffset.UtcNow, packageId);
+        await SaveAsync(entries, ct);
+    }
+
+    /// <summary>Drops every entry recorded for <paramref name="packageId"/>; writes only if one existed.</summary>
+    public async Task ForgetAsync(string packageId, CancellationToken ct)
+    {
+        var entries = await LoadAsync(ct);
+        var stale = entries
+            .Where(kv => string.Equals(kv.Value.PackageId, packageId, StringComparison.OrdinalIgnoreCase))
+            .Select(kv => kv.Key)
+            .ToList();
+        if (stale.Count == 0) return;
+        foreach (var key in stale) entries.Remove(key);
         await SaveAsync(entries, ct);
     }
 }

@@ -35,6 +35,29 @@ public class PlannerTests
     }
 
     [Fact]
+    public void Vscode_url_entry_keeps_its_url_alongside_marketplace_entries()
+    {
+        var config = new ConfigFile(new Dictionary<string, Block>
+        {
+            ["vscode"] = new()
+            {
+                Platform = "linux",
+                Vscode = new Dictionary<string, PackageSpec>
+                {
+                    ["ms-python.python"] = new(),
+                    ["phonedash.phone-dash-focus"] = new() { Url = "~/ext.vsix" },
+                },
+            },
+        });
+
+        var plan = Planner.Plan(config, Linux).Packages;
+
+        plan.Select(p => (p.Manager, p.Id, p.Spec.Url)).ShouldBe(
+            [(ManagerKind.VsCode, "ms-python.python", null), (ManagerKind.VsCode, "phonedash.phone-dash-focus", "~/ext.vsix")],
+            ignoreOrder: true);
+    }
+
+    [Fact]
     public void Topo_sort_places_dependencies_first()
     {
         var config = new ConfigFile(new Dictionary<string, Block>

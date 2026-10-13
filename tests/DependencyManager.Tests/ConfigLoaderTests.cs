@@ -175,6 +175,29 @@ public class ConfigLoaderTests
     }
 
     [Fact]
+    public void Parses_vscode_entry_with_url_and_sha256()
+    {
+        const string yaml = """
+            kairos-vscode:
+              platform: linux
+              tags: [desktop]
+              vscode:
+                phonedash.phone-dash-focus:
+                  url: ~/.local/share/phone-dash/phone-dash-focus.vsix
+                other.ext:
+                  url: https://example.com/other-1.0.0.vsix
+                  sha256: abc123
+            """;
+
+        var block = ConfigLoader.Parse(yaml).Blocks["kairos-vscode"];
+
+        block.Vscode!["phonedash.phone-dash-focus"].Url.ShouldBe("~/.local/share/phone-dash/phone-dash-focus.vsix");
+        block.Vscode["phonedash.phone-dash-focus"].Sha256.ShouldBeNull();
+        block.Vscode["other.ext"].Url.ShouldBe("https://example.com/other-1.0.0.vsix");
+        block.Vscode["other.ext"].Sha256.ShouldBe("abc123");
+    }
+
+    [Fact]
     public void Parses_scope_on_package_spec()
     {
         const string yaml = """

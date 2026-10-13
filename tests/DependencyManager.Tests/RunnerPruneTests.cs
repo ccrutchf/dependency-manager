@@ -143,6 +143,29 @@ public class RunnerPruneTests
         fake.Uninstalled.ShouldBe(new[] { "org.example.Undeclared" });
     }
 
+    [Fact]
+    public async Task Prune_never_removes_a_declared_vsix_extension()
+    {
+        // `code --list-extensions` lists a .vsix install under its publisher.name id,
+        // so declaring it by that id (with a url) keeps it like any Marketplace id.
+        var fake = new FakePrunableManager
+        {
+            Kind = ManagerKind.VsCode,
+            InstalledExplicit = new List<string> { "phonedash.phone-dash-focus", "someone.undeclared" },
+        };
+        var runner = new Runner.Runner(new IPackageManager[] { fake });
+        var vsix = new ResolvedPackage(
+            ManagerKind.VsCode,
+            "PhoneDash.phone-dash-focus",
+            new PackageSpec { Url = "~/.local/share/phone-dash/phone-dash-focus.vsix" },
+            "block");
+
+        var rc = await SilentRun(() => runner.PruneAsync(new[] { vsix }, apply: true, CancellationToken.None));
+
+        rc.ShouldBe(0);
+        fake.Uninstalled.ShouldBe(new[] { "someone.undeclared" });
+    }
+
     private static async Task<int> SilentRun(Func<Task<int>> action)
     {
         var prev = Console.Out;

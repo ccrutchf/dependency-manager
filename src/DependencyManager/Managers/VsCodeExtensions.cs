@@ -1,4 +1,5 @@
 using System.Text.Json;
+using DependencyManager.Util;
 
 namespace DependencyManager.Managers;
 
@@ -78,4 +79,28 @@ public static class VsCodeExtensions
         var pulled = new HashSet<string>(pulledIn, StringComparer.OrdinalIgnoreCase);
         return installed.Where(id => !pulled.Contains(id)).ToList();
     }
+
+    /// <summary>
+    /// The installed ids `update` may reinstall from the Marketplace: everything
+    /// except extensions the vsix cache records as installed from a .vsix, which
+    /// the Marketplace doesn't have (or would replace with a different build).
+    /// </summary>
+    public static IReadOnlyList<string> Updatable(
+        IEnumerable<string> installed, IReadOnlyDictionary<string, DownloadCacheEntry> vsixCache)
+    {
+        var fromVsix = FromVsix(vsixCache);
+        return installed.Where(id => !fromVsix.Contains(id)).ToList();
+    }
+
+    /// <summary>
+    /// A Marketplace (no url) entry is installed when listed — unless the vsix cache
+    /// says it came from a .vsix, in which case it reinstalls from the Marketplace
+    /// (and leaves the cache), so `update` stops skipping it.
+    /// </summary>
+    public static bool IsMarketplaceInstalled(
+        IEnumerable<string> listed, string id, IReadOnlyDictionary<string, DownloadCacheEntry> vsixCache) =>
+        listed.Contains(id, StringComparer.OrdinalIgnoreCase) && !FromVsix(vsixCache).Contains(id);
+
+    private static HashSet<string> FromVsix(IReadOnlyDictionary<string, DownloadCacheEntry> vsixCache) =>
+        new(vsixCache.Values.Select(e => e.PackageId).OfType<string>(), StringComparer.OrdinalIgnoreCase);
 }

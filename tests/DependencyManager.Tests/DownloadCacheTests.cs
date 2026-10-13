@@ -80,6 +80,29 @@ public class DownloadCacheTests : IDisposable
     }
 
     [Fact]
+    public async Task ForgetAsync_removes_every_entry_for_the_package_id_case_insensitively()
+    {
+        var cache = new DownloadCache(_cachePath);
+        await cache.RecordAsync("/home/alice/ext.vsix", "sha-a", "PhoneDash.phone-dash-focus", CancellationToken.None);
+        await cache.RecordAsync("/home/alice/other.vsix", "sha-b", "other.ext", CancellationToken.None);
+
+        await cache.ForgetAsync("phonedash.phone-dash-focus", CancellationToken.None);
+
+        var entries = await cache.LoadAsync(CancellationToken.None);
+        entries.Keys.ShouldBe(["/home/alice/other.vsix"]);
+    }
+
+    [Fact]
+    public async Task ForgetAsync_does_not_create_a_cache_file_when_nothing_is_recorded()
+    {
+        var cache = new DownloadCache(_cachePath);
+
+        await cache.ForgetAsync("ms-python.python", CancellationToken.None);
+
+        File.Exists(_cachePath).ShouldBeFalse();
+    }
+
+    [Fact]
     public async Task SaveAsync_round_trips_multiple_entries()
     {
         var cache = new DownloadCache(_cachePath);

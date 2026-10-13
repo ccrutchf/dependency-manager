@@ -4,7 +4,7 @@ namespace DependencyManager.Util;
 
 /// <summary>
 /// Download-to-temp-file and sha256 helpers shared by the url-installing
-/// providers (deb, flatpak bundles).
+/// providers (deb, flatpak bundles, vscode .vsix files).
 /// </summary>
 public static class Downloads
 {
