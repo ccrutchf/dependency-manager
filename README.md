@@ -43,6 +43,42 @@ linux-desktop-flatpaks:
 - `install --prune` treats a bundle app like any other flatpak app: declared ones are kept.
   Removing an undeclared one also removes the `<name>-origin` remote flatpak created for it.
 
+## VS Code extensions from a .vsix
+
+A vscode entry normally installs from the Marketplace by id. Give it a `url:` instead to
+install a `.vsix` file, for extensions that aren't on the Marketplace (e.g. a private one
+built with `vsce package`):
+
+```yaml
+kairos-vscode:
+  platform: linux
+  tags: [desktop]
+  vscode:
+    phonedash.phone-dash-focus:
+      url: ~/.local/share/phone-dash/phone-dash-focus.vsix
+    someone.released-ext:
+      url: https://example.com/released-ext-1.2.0.vsix
+      sha256: 9f86d081884c7d659a2feaa0c55ad015a3bf4f1b2b0b822cd15d6c15b0f00a08   # optional
+```
+
+- `url:` can be an `http(s)://` url (downloaded), an absolute path, a `~/` path, or a
+  `file://` url. Relative paths are rejected.
+- The key must be the extension's `publisher.name`. depend reads it from
+  `extension/package.json` inside the `.vsix` and refuses a file whose id doesn't match
+  (case doesn't matter).
+- depend runs `code --install-extension <file> --force` (or the `source:` binary) and
+  records the url/path and the file's sha256 in `~/.cache/depend/vsix.json`.
+- The entry counts as installed when the extension is listed by `code --list-extensions`
+  and the record has the same url/path and sha256. Without a `sha256:` pin, a local file
+  is hashed on every check, so rebuilding it reinstalls it on the next `install`. An
+  `https` url is not re-downloaded just to check it: change the url or pin a new
+  `sha256:` to upgrade. If a local file is missing but the extension is installed, it
+  counts as installed; if it is missing and not installed, that entry fails and names the path.
+- `depend update` skips extensions recorded as installed from a `.vsix`, so it never
+  asks the Marketplace for them. Removing `url:` from an entry makes the next `install`
+  reinstall it from the Marketplace, after which `update` covers it again.
+- `install --prune` treats a `.vsix` extension like any other: declared ones are kept.
+
 ## Machine tags
 
 `platform`/`architecture`/`version` can't tell apart two machines on the same OS and

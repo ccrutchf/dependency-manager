@@ -74,6 +74,11 @@ vscode-extensions:
     ms-python.python:
     rust-lang.rust-analyzer:
     github.copilot:
+    # Not on the Marketplace: install a .vsix (https url, absolute, ~/ or file:// path).
+    # The key must be its publisher.name; a rebuilt local file reinstalls on the next
+    # install, and `depend update` leaves it alone.
+    phonedash.phone-dash-focus:
+      url: ~/.local/share/phone-dash/phone-dash-focus.vsix
 
 browser-extensions:
   platform: linux
